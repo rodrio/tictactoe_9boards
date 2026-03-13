@@ -188,6 +188,137 @@
             transform: translateY(-2px);
         }
 
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s ease;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .modal-title {
+            font-size: 1.8em;
+            color: #333;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.2s ease;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+
+        .close-btn:hover {
+            color: #333;
+            background: #f8f9fa;
+        }
+
+        .rules-section {
+            margin-bottom: 25px;
+        }
+
+        .rules-section h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .rules-section p, .rules-section li {
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .rules-section ul {
+            padding-left: 20px;
+        }
+
+        .example-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .example-box strong {
+            color: #333;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
         .instructions {
             text-align: center;
             margin-top: 20px;
@@ -235,12 +366,86 @@
 
         <div class="controls">
             <button class="btn" onclick="resetGame()">🔄 New Game</button>
+            <button class="btn-secondary" onclick="showRules()">📖 Rules</button>
         </div>
 
         <div class="instructions">
             <strong>How to play:</strong> Click any cell in any of the 9 boards to place your mark. 
             Win an individual board to claim that space in the main board. 
             Win three in a row on the main board to win the game!
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📖 9-Boards Tic-Tac-Toe Rules</h2>
+                <button class="close-btn" onclick="hideRules()">&times;</button>
+            </div>
+            
+            <div class="rules-section">
+                <h3>🎯 The Big Picture</h3>
+                <p>This is like regular tic-tac-toe, but with a twist! Instead of one board, you have NINE boards arranged in a 3x3 grid. Your goal is to win the BIG game by winning three of the small boards in a row.</p>
+            </div>
+
+            <div class="rules-section">
+                <h3>🎮 How to Play</h3>
+                <ul>
+                    <li><strong>Your turn:</strong> Click any empty square in any of the 9 small boards</li>
+                    <li><strong>Mark your territory:</strong> Place your X or O in the chosen square</li>
+                    <li><strong>Win a small board:</strong> Get three in a row (horizontal, vertical, or diagonal) in any individual board</li>
+                    <li><strong>Claim the big square:</strong> When you win a small board, that board's position in the main 3x3 grid gets marked with your symbol</li>
+                    <li><strong>Win the game:</strong> Get three of your symbols in a row on the main board!</li>
+                </ul>
+            </div>
+
+            <div class="rules-section">
+                <h3>🏆 Winning Conditions</h3>
+                <p><strong>To win the game:</strong> You must win 3 small boards that form a line on the main board.</p>
+                <ul>
+                    <li>Win the top-left, top-center, and top-right boards (horizontal win)</li>
+                    <li>Win the top-left, center, and bottom-left boards (vertical win)</li>
+                    <li>Win the top-left, center, and bottom-right boards (diagonal win)</li>
+                    <li>And so on... just like regular tic-tac-toe!</li>
+                </ul>
+            </div>
+
+            <div class="rules-section">
+                <h3>🤝 What About Draws?</h3>
+                <ul>
+                    <li><strong>Small board draw:</strong> If a small board fills up with no winner, it gets marked with 'D' on the main board</li>
+                    <li><strong>Big game draw:</strong> If the entire main board fills up with no three-in-a-row winner, the whole game is a draw</li>
+                </ul>
+            </div>
+
+            <div class="rules-section">
+                <h3>💡 Strategy Tips</h3>
+                <div class="example-box">
+                    <strong>Think ahead!</strong> Don't just focus on winning one board. Think about which boards will help you win the main game.
+                </div>
+                <div class="example-box">
+                    <strong>Block your opponent!</strong> If you see your opponent about to win three boards in a row, try to win one of those boards first.
+                </div>
+                <div class="example-box">
+                    <strong>Control the center!</strong> The center board is part of 4 different winning lines (horizontal, vertical, and both diagonals).
+                </div>
+            </div>
+
+            <div class="rules-section">
+                <h3>🎨 Visual Guide</h3>
+                <p><strong>Green boards:</strong> Won by Player X</p>
+                <p><strong>Red boards:</strong> Won by Player O</p>
+                <p><strong>Yellow boards:</strong> Ended in a draw</p>
+                <p><strong>White boards:</strong> Still in progress</p>
+            </div>
+
+            <div class="rules-section">
+                <h3>❓ Quick FAQ</h3>
+                <p><strong>Q: Can I play in any board?</strong><br>A: Yes! You can play in any empty square in any board on your turn.</p>
+                <p><strong>Q: What happens when a board is won?</strong><br>A: That board closes and its position gets marked on the main board. You can't play in it anymore.</p>
+                <p><strong>Q: How long does a game take?</strong><br>A: Usually 10-20 minutes, depending on how strategic you are!</p>
+            </div>
         </div>
     </div>
 
@@ -432,6 +637,29 @@
                 renderBoards();
             });
         }
+
+        function showRules() {
+            document.getElementById('rulesModal').classList.add('show');
+        }
+
+        function hideRules() {
+            document.getElementById('rulesModal').classList.remove('show');
+        }
+
+        // Close modal when clicking outside the modal content
+        window.onclick = function(event) {
+            const modal = document.getElementById('rulesModal');
+            if (event.target === modal) {
+                hideRules();
+            }
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                hideRules();
+            }
+        });
 
         // Initialize the game when the page loads
         document.addEventListener('DOMContentLoaded', initializeGame);
