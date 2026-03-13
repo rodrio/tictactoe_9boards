@@ -1,18 +1,18 @@
 from flask import Flask, render_template, jsonify, request
 import json
 import os
-from google import genai
+import datetime
+import logging
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+    print("Warning: google-generativeai not installed. AI features will be disabled.")
 
 app = Flask(__name__)
 
-# Configure Gemini API
-try:
-    genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-    model = genai.GenerativeModel('gemini-1.5-flash-lite-preview-0617')
-    AI_ENABLED = True
-except Exception as e:
-    print(f"Warning: Gemini API not configured. AI mode will be disabled. Error: {e}")
-    AI_ENABLED = False
+# AI availability flag
+AI_ENABLED = genai is not None
 
 class TicTacToe9Boards:
     def __init__(self):
@@ -27,20 +27,29 @@ class TicTacToe9Boards:
         self.difficulty = 'Noobie'  # 'Noobie', 'Average', 'Expert'
         self.ai_thinking = False
         self.api_key = None  # Store API key dynamically
+        self.last_error = None
         
     def make_move(self, board_idx, row, col):
         if self.game_over:
+            self.last_error = "Game is over"
             return False
             
         board_row = board_idx // 3
         board_col = board_idx % 3
         
+        # Validate input ranges
+        if not (0 <= board_idx <= 8 and 0 <= row <= 2 and 0 <= col <= 2):
+            self.last_error = "Invalid position"
+            return False
+        
         # Check if move is valid
         if self.boards[board_idx][row][col] != '':
+            self.last_error = "Cell already occupied"
             return False
         
         # Check if board is already won or drawn (closed)
         if self.main_board[board_row][board_col] != '':
+            self.last_error = "Board is closed"
             return False
             
         # Make the move
@@ -71,6 +80,7 @@ class TicTacToe9Boards:
         
         # Switch player
         self.current_player = 'O' if self.current_player == 'X' else 'X'
+        self.last_error = None
         return True
     
     def check_board_winner(self, board_idx):
@@ -185,9 +195,9 @@ class TicTacToe9Boards:
         
         try:
             # Configure Gemini with the provided API key
-            import google.genai as genai
+            import google.generativeai as genai
             genai.configure(api_key=self.api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
             
             board_text = self.board_to_text()
             prompt = self.get_ai_prompt(board_text)
@@ -225,145 +235,6 @@ class TicTacToe9Boards:
             # Log the error and stop the game
             self.log_ai_error(f"CRITICAL ERROR: {str(e)}")
             print("AI API failure - game stopped. Please restart for AI functionality.")
-            return self.get_random_move()
-    
-    def clear_log_file(self):
-        """Clear the AI interaction log file"""
-        try:
-            with open('ai_interactions.log', 'w', encoding='utf-8') as f:
-                f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] === NEW GAME STARTED ===\n")
-        except Exception as e:
-            logging.error(f"Log clearing error: {e}")
-    
-    def log_game_move(self, board_idx, row, col):
-        """Log game moves for AI analysis"""
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        player = self.current_player
-        position = f"Board {board_idx + 1}, Row {row + 1}, Col {col + 1}"
-        
-        log_entry = f"[{timestamp}] MOVE: {player} played at {position}\n"
-        
-        try:
-            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
-                f.write(log_entry)
-        except Exception as e:
-            logging.error(f"Move logging error: {e}")
-    
-    def log_ai_prompt(self, prompt):
-        """Log AI prompts sent to Gemini"""
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        log_entry = f"[{timestamp}] PROMPT: {prompt}\n"
-        
-        try:
-            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
-                f.write(log_entry)
-        except Exception as e:
-            logging.error(f"Prompt logging error: {e}")
-    
-    def log_ai_response(self, response):
-        """Log AI responses from Gemini"""
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        log_entry = f"[{timestamp}] RESPONSE: {response}\n"
-        
-        try:
-            with open('ai/responses.log', 'a', encoding='utf-8') as f:
-                f.write(log_entry)
-        except Exception as e:
-            logging.error(f"Response logging error: {e}")
-    
-    def log_ai_error(self, error_message):
-        """Log AI errors to file"""
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        log_entry = f"[{timestamp}] ERROR: {error_message}\n"
-        
-        try:
-            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
-                f.write(log_entry)
-        except Exception as e:
-            logging.error(f"Error logging error: {e}")
-    
-    def is_ai_turn(self):
-        return self.game_mode == '1-player' and self.current_player == 'O' and not self.game_over
-    
-    def board_to_text(self):
-        """Convert the current board state to a text representation for the AI"""
-        text = "9-Boards Tic-Tac-Toe Current State:\n\n"
-        
-        # Main board status
-        text += "Main Board (shows winners of individual boards):\n"
-        for row in range(3):
-            row_text = ""
-            for col in range(3):
-                val = self.main_board[row][col]
-                if val == '':
-                    row_text += "[ ] "
-                elif val == 'D':
-                    row_text += "[D] "
-                else:
-                    row_text += f"[{val}] "
-            text += row_text.rstrip() + "\n"
-        
-        text += "\nIndividual Boards:\n"
-        for board_idx in range(9):
-            text += f"\nBoard {board_idx + 1} (Position {chr(65 + board_idx)}):\n"
-            board = self.boards[board_idx]
-            for row in board:
-                row_text = ""
-                for cell in row:
-                    if cell == '':
-                        row_text += ". "
-                    else:
-                        row_text += cell + " "
-                text += row_text.rstrip() + "\n"
-        
-        text += f"\nCurrent Player: {self.current_player}\n"
-        text += f"Game Mode: {self.game_mode}\n"
-        
-        return text
-    
-    def get_ai_move(self):
-        """Get AI move using Gemini API"""
-        if not AI_ENABLED:
-            # Fallback: make a random valid move
-            return self.get_random_move()
-        
-        try:
-            board_text = self.board_to_text()
-            prompt = self.get_ai_prompt(board_text)
-            
-            # Log the prompt sent to Gemini
-            self.log_ai_prompt(prompt)
-            
-            response = model.generate_content(prompt)
-            move_text = response.text.strip()
-            
-            # Log the response from Gemini
-            self.log_ai_response(move_text)
-            
-            # Parse response
-            if ',' in move_text:
-                parts = move_text.split(',')
-                if len(parts) == 3:
-                    try:
-                        board_idx = int(parts[0])
-                        row = int(parts[1])
-                        col = int(parts[2])
-                        
-                        # Validate move
-                        if (0 <= board_idx <= 8 and 0 <= row <= 2 and 0 <= col <= 2 and 
-                            self.boards[board_idx][row][col] == ''):
-                            return board_idx, row, col
-                    except ValueError:
-                        pass
-            
-            # If AI response is invalid, make a random move
-            return self.get_random_move()
-            
-        except Exception as e:
-            print(f"AI move error: {e}")
             return self.get_random_move()
     
     def get_ai_prompt(self, board_text):
@@ -451,6 +322,23 @@ Analyze the board deeply and suggest your optimal move. Respond with ONLY the mo
 Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
 """
     
+    def get_game_state(self):
+        """Return the current game state as a dictionary"""
+        return {
+            'boards': self.boards,
+            'main_board': self.main_board,
+            'current_player': self.current_player,
+            'game_over': self.game_over,
+            'winner': self.winner,
+            'game_mode': self.game_mode,
+            'difficulty': self.difficulty,
+            'ai_thinking': self.ai_thinking
+        }
+    
+    def get_last_error(self):
+        """Return the last error message"""
+        return self.last_error
+    
     def get_random_move(self):
         """Fallback: make a random valid move"""
         valid_moves = []
@@ -465,6 +353,103 @@ Make sure the chosen cell is empty (marked with "." in the individual boards) AN
             return random.choice(valid_moves)
         
         return None
+
+    def clear_log_file(self):
+        """Clear the AI interaction log file"""
+        try:
+            with open('ai_interactions.log', 'w', encoding='utf-8') as f:
+                f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] === NEW GAME STARTED ===\n")
+        except Exception as e:
+            logging.error(f"Log clearing error: {e}")
+    
+    def log_game_move(self, board_idx, row, col):
+        """Log game moves for AI analysis"""
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        player = self.current_player
+        position = f"Board {board_idx + 1}, Row {row + 1}, Col {col + 1}"
+        
+        log_entry = f"[{timestamp}] MOVE: {player} played at {position}\n"
+        
+        try:
+            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            logging.error(f"Move logging error: {e}")
+    
+    def log_ai_prompt(self, prompt):
+        """Log AI prompts sent to Gemini"""
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        log_entry = f"[{timestamp}] PROMPT: {prompt}\n"
+        
+        try:
+            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            logging.error(f"Prompt logging error: {e}")
+    
+    def log_ai_response(self, response):
+        """Log AI responses from Gemini"""
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        log_entry = f"[{timestamp}] RESPONSE: {response}\n"
+        
+        try:
+            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            logging.error(f"Response logging error: {e}")
+    
+    def log_ai_error(self, error_message):
+        """Log AI errors to file"""
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        log_entry = f"[{timestamp}] ERROR: {error_message}\n"
+        
+        try:
+            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            logging.error(f"Error logging error: {e}")
+    
+    def is_ai_turn(self):
+        return self.game_mode == '1-player' and self.current_player == 'O' and not self.game_over
+    
+    def board_to_text(self):
+        """Convert the current board state to a text representation for the AI"""
+        text = "9-Boards Tic-Tac-Toe Current State:\n\n"
+        
+        # Main board status
+        text += "Main Board (shows winners of individual boards):\n"
+        for row in range(3):
+            row_text = ""
+            for col in range(3):
+                val = self.main_board[row][col]
+                if val == '':
+                    row_text += "[ ] "
+                elif val == 'D':
+                    row_text += "[D] "
+                else:
+                    row_text += f"[{val}] "
+            text += row_text.rstrip() + "\n"
+        
+        text += "\nIndividual Boards:\n"
+        for board_idx in range(9):
+            text += f"\nBoard {board_idx + 1} (Position {chr(65 + board_idx)}):\n"
+            board = self.boards[board_idx]
+            for row in board:
+                row_text = ""
+                for cell in row:
+                    if cell == '':
+                        row_text += ". "
+                    else:
+                        row_text += cell + " "
+                text += row_text.rstrip() + "\n"
+        
+        text += f"\nCurrent Player: {self.current_player}\n"
+        text += f"Game Mode: {self.game_mode}\n"
+        
+        return text
 
 # Global game instance
 game = TicTacToe9Boards()
@@ -489,97 +474,57 @@ def get_game_state():
 
 @app.route('/api/make_move', methods=['POST'])
 def make_move():
+    """Handle player moves"""
     data = request.json
-    board_idx = data['board_idx']
-    row = data['row']
-    col = data['col']
+    board_idx = data.get('board_idx')
+    row = data.get('row')
+    col = data.get('col')
     
-    success = game.make_move(board_idx, row, col)
+    print(f"DEBUG: make_move called - board_idx: {board_idx}, row: {row}, col: {col}, current_player: {game.current_player}")
     
-    response_data = {
-        'success': success,
-        'game_state': {
-            'boards': game.boards,
-            'main_board': game.main_board,
-            'current_player': game.current_player,
-            'game_over': game.game_over,
-            'winner': game.winner,
-            'game_mode': game.game_mode,
-            'difficulty': game.difficulty,
-            'ai_thinking': game.ai_thinking,
-            'ai_enabled': AI_ENABLED
-        }
-    }
-    
-    # If it's AI's turn next and game is not over
-    if success and game.is_ai_turn():
-        game.ai_thinking = True
-        response_data['game_state']['ai_thinking'] = True
+    if game.make_move(board_idx, row, col):
+        print(f"DEBUG: make_move successful")
         
-        # Make AI move
-        ai_move = game.get_ai_move()
-        if ai_move:
-            ai_board_idx, ai_row, ai_col = ai_move
-            game.make_move(ai_board_idx, ai_row, ai_col)
+        # Check if it's AI's turn next and game is not over
+        if game.is_ai_turn():
+            print(f"DEBUG: AI turn detected, making AI move")
+            game.ai_thinking = True
             
-            response_data['ai_move'] = {
-                'board_idx': ai_board_idx,
-                'row': ai_row,
-                'col': ai_col
-            }
+            # Make AI move
+            ai_move = game.get_ai_move()
+            if ai_move:
+                ai_board_idx, ai_row, ai_col = ai_move
+                if game.make_move(ai_board_idx, ai_row, ai_col):
+                    print(f"DEBUG: AI move successful - Board {ai_board_idx}, Row {ai_row}, Col {ai_col}")
+                else:
+                    print(f"DEBUG: AI move failed")
+            else:
+                print(f"DEBUG: No valid AI moves available")
             
-            # Update game state after AI move
-            response_data['game_state'] = {
-                'boards': game.boards,
-                'main_board': game.main_board,
-                'current_player': game.current_player,
-                'game_over': game.game_over,
-                'winner': game.winner,
-                'game_mode': game.game_mode,
-                'difficulty': game.difficulty,
-                'ai_thinking': False,
-                'ai_enabled': AI_ENABLED
-            }
-    
-    return jsonify(response_data)
-
-@app.route('/api/reset', methods=['POST'])
-def reset_game():
-    data = request.json or {}
-    game_mode = data.get('game_mode', '1-player')
-    difficulty = data.get('difficulty', 'Noobie')
-    game.reset_game(game_mode, difficulty)
-    return jsonify({
-        'game_state': {
-            'boards': game.boards,
-            'main_board': game.main_board,
-            'current_player': game.current_player,
-            'game_over': game.game_over,
-            'winner': game.winner,
-            'game_mode': game.game_mode,
-            'difficulty': game.difficulty,
-            'ai_thinking': game.ai_thinking,
-            'ai_enabled': AI_ENABLED
-        }
-    })
+            game.ai_thinking = False
+        
+        game_state = game.get_game_state()
+        game_state['ai_enabled'] = AI_ENABLED
+        return jsonify({
+            'success': True,
+            'game_state': game_state
+        })
+    else:
+        print(f"DEBUG: make_move failed - {game.get_last_error()}")
+        return jsonify({
+            'success': False,
+            'error': game.get_last_error() or 'Invalid move'
+        })
 
 @app.route('/api/set_game_mode', methods=['POST'])
 def set_game_mode():
     data = request.json
     game_mode = data.get('game_mode', '1-player')
     game.set_game_mode(game_mode)
+    game_state = game.get_game_state()
+    game_state['ai_enabled'] = AI_ENABLED
     return jsonify({
-        'game_state': {
-            'boards': game.boards,
-            'main_board': game.main_board,
-            'current_player': game.current_player,
-            'game_over': game.game_over,
-            'winner': game.winner,
-            'game_mode': game.game_mode,
-            'difficulty': game.difficulty,
-            'ai_thinking': game.ai_thinking,
-            'ai_enabled': AI_ENABLED
-        }
+        'game_state': game_state
     })
 
 @app.route('/api/set_difficulty', methods=['POST'])
@@ -587,18 +532,24 @@ def set_difficulty():
     data = request.json
     difficulty = data.get('difficulty', 'Noobie')
     game.set_difficulty(difficulty)
+    game_state = game.get_game_state()
+    game_state['ai_enabled'] = AI_ENABLED
     return jsonify({
-        'game_state': {
-            'boards': game.boards,
-            'main_board': game.main_board,
-            'current_player': game.current_player,
-            'game_over': game.game_over,
-            'winner': game.winner,
-            'game_mode': game.game_mode,
-            'difficulty': game.difficulty,
-            'ai_thinking': game.ai_thinking,
-            'ai_enabled': AI_ENABLED
-        }
+        'game_state': game_state
+    })
+
+@app.route('/api/reset', methods=['POST'])
+def reset_game():
+    """Reset the game with specified mode and difficulty"""
+    data = request.json
+    game_mode = data.get('game_mode', '1-player')
+    difficulty = data.get('difficulty', 'Noobie')
+    
+    game.reset_game(game_mode, difficulty)
+    game_state = game.get_game_state()
+    game_state['ai_enabled'] = AI_ENABLED
+    return jsonify({
+        'game_state': game_state
     })
 
 @app.route('/api/validate_api_key', methods=['POST'])
@@ -614,10 +565,10 @@ def validate_api_key():
         })
     
     try:
-        # Try to configure Gemini with the provided key
-        import google.genai as genai
+        # Configure Gemini with the provided key
+        import google.generativeai as genai
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
         
         # Test the API with a simple request
         test_response = model.generate_content("Hello, are you working?")
@@ -635,21 +586,10 @@ def validate_api_key():
             
     except Exception as e:
         error_message = str(e)
-        if "API_KEY" in error_message or "invalid" in error_message.lower():
-            return jsonify({
-                'valid': False,
-                'error': 'Invalid API key'
-            })
-        elif "quota" in error_message.lower() or "rate" in error_message.lower():
-            return jsonify({
-                'valid': False,
-                'error': 'API quota exceeded or rate limited'
-            })
-        else:
-            return jsonify({
-                'valid': False,
-                'error': f'API error: {error_message}'
-            })
+        return jsonify({
+            'valid': False,
+            'error': f'API key validation failed: {error_message}'
+        })
 
 @app.route('/api/set_api_key', methods=['POST'])
 def set_api_key():
@@ -662,16 +602,6 @@ def set_api_key():
     return jsonify({
         'success': True,
         'message': 'API key set successfully'
-    })
-
-@app.route('/api/clear_api_key', methods=['POST'])
-def clear_api_key():
-    """Clear the API key"""
-    game.clear_api_key()
-    
-    return jsonify({
-        'success': True,
-        'message': 'API key cleared'
     })
 
 @app.route('/api/ai_message', methods=['POST'])
@@ -692,9 +622,9 @@ def get_ai_message():
     
     try:
         # Use the game's API key
-        import google.genai as genai
+        import google.generativeai as genai
         genai.configure(api_key=game.api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
         
         response = model.generate_content(prompt)
         message = response.text.strip()
@@ -703,12 +633,11 @@ def get_ai_message():
             'success': True,
             'message': message
         })
-        
     except Exception as e:
-        print(f"AI message error: {e}")
+        print(f"AI message endpoint error: {e}")
         return jsonify({
             'success': False,
-            'message': 'AI is experiencing technical difficulties.'
+            'error': 'AI message failed'
         })
 
 def log_ai_interaction(prompt, game_log):

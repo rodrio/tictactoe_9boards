@@ -534,7 +534,6 @@
             }
         }
     </style>
-</head>
 <body>
     <div class="container">
         <h1>🎮 Tic-Tac-Toe 9-Boards</h1>
@@ -575,8 +574,8 @@
                 </div>
                 <div class="api-key-status" id="apiKeyStatus"></div>
             </div>
-            <div class="current-player">Current Player: <span id="currentPlayer">X</span></div>
-            <div class="game-status" id="gameStatus">Game in progress</div>
+            <div class="current-player" id="currentPlayerSection" style="display: none;">Current Player: <span id="currentPlayer">X</span></div>
+            <div class="game-status" id="gameStatus">Click any cell to start the game</div>
             <div class="ai-status" id="aiStatus" style="display: none;">🤔 AI is thinking...</div>
         </div>
 
@@ -725,22 +724,27 @@
             document.getElementById('mode1Player').classList.toggle('active', gameState.game_mode === '1-player');
             document.getElementById('mode2Players').classList.toggle('active', gameState.game_mode === '2-players');
             
-            // Show/hide difficulty selector based on game mode
+            // Show/hide difficulty selector based on game mode and API key status
             const difficultySelector = document.getElementById('difficultySelector');
             const apiKeySection = document.getElementById('apiKeySection');
+            const apiKeyStatus = document.getElementById('apiKeyStatus');
+            const hasValidApiKey = apiKeyStatus.classList.contains('success');
             
             if (gameState.game_mode === '1-player') {
-                difficultySelector.style.display = 'block';
                 apiKeySection.style.display = 'block';
+                // Only show difficulty selector if API key is valid
+                difficultySelector.style.display = hasValidApiKey ? 'block' : 'none';
             } else {
                 difficultySelector.style.display = 'none';
                 apiKeySection.style.display = 'none';
             }
             
-            // Update difficulty buttons
-            document.getElementById('diffNoobie').classList.toggle('active', gameState.difficulty === 'Noobie');
-            document.getElementById('diffAverage').classList.toggle('active', gameState.difficulty === 'Average');
-            document.getElementById('diffExpert').classList.toggle('active', gameState.difficulty === 'Expert');
+            // Update difficulty buttons (only if visible)
+            if (hasValidApiKey) {
+                document.getElementById('diffNoobie').classList.toggle('active', gameState.difficulty === 'Noobie');
+                document.getElementById('diffAverage').classList.toggle('active', gameState.difficulty === 'Average');
+                document.getElementById('diffExpert').classList.toggle('active', gameState.difficulty === 'Expert');
+            }
             
             // Update AI status
             const aiStatus = document.getElementById('aiStatus');
@@ -751,19 +755,39 @@
             }
             
             const statusElement = document.getElementById('gameStatus');
+            
+            // Check if game has started (at least one move made)
+            const gameStarted = gameState.boards.some(board => 
+                board.some(row => row.some(cell => cell !== ''))
+            );
+            
+            // Show/hide current player section based on game start
+            const currentPlayerSection = document.getElementById('currentPlayerSection');
+            if (gameStarted) {
+                currentPlayerSection.style.display = 'block';
+            } else {
+                currentPlayerSection.style.display = 'none';
+            }
+            
             if (gameState.game_over) {
                 if (gameState.winner === 'Draw') {
                     statusElement.innerHTML = '<span class="draw">Game Draw! 🤝</span>';
                 } else {
-                    const winnerText = gameState.game_mode === '1-player' && gameState.winner === 'O' ? `${gameState.difficulty} AI` : `Player ${gameState.winner}`;
+                    const winnerText = gameState.game_mode === '1-player' && gameState.winner === 'O' ? 
+                        (hasValidApiKey ? `${gameState.difficulty} AI` : 'Random AI') : `Player ${gameState.winner}`;
                     statusElement.innerHTML = `<span class="winner">${winnerText} Wins! 🎉</span>`;
                 }
                 
                 // Show victory modal
                 showVictory();
-            } else {
-                const currentPlayerText = gameState.game_mode === '1-player' && gameState.current_player === 'O' ? `${gameState.difficulty} AI` : `Player ${gameState.current_player}`;
+            } else if (gameStarted) {
+                // Only show game progress if game has started
+                const currentPlayerText = gameState.game_mode === '1-player' && gameState.current_player === 'O' ? 
+                    (hasValidApiKey ? `${gameState.difficulty} AI` : 'Random AI') : `Player ${gameState.current_player}`;
                 statusElement.textContent = `Game in progress - ${currentPlayerText}'s turn`;
+            } else {
+                // Game hasn't started yet - show minimal status
+                statusElement.textContent = 'Click any cell to start the game';
             }
         }
 
@@ -901,13 +925,6 @@
                 return;
             }
             
-            // Check if the board is already won or drawn (closed)
-            const boardRow = Math.floor(boardIdx / 3);
-            const boardCol = boardIdx % 3;
-            if (gameState.main_board[boardRow][boardCol] !== '') {
-                return;
-            }
-            
             fetch('/api/make_move', {
                 method: 'POST',
                 headers: {
@@ -927,11 +944,17 @@
                     renderMainBoard();
                     renderBoards();
                     
-                    // If AI made a move, highlight it
-                    if (data.ai_move) {
-                        highlightAIMove(data.ai_move.board_idx, data.ai_move.row, data.ai_move.col);
+                    // In 1-player mode, if game is not over and current player is O (AI's turn), make AI move
+                    if (gameState.game_mode === '1-player' && !gameState.game_over && gameState.current_player === 'O') {
+                        setTimeout(() => makeAIMove(), 1000); // Delay for better UX
                     }
+                } else {
+                    alert(data.error || 'Invalid move');
                 }
+            })
+            .catch(error => {
+                console.error('Error making move:', error);
+                alert('Error making move');
             });
         }
 
@@ -1006,6 +1029,8 @@
                 apiKeyStatus.className = 'api-key-status info';
                 // Clear the API key on backend
                 clearApiKey();
+                // Update UI to hide difficulty selector
+                updateUI();
                 return;
             }
             
@@ -1036,12 +1061,16 @@
                     // Clear the API key on backend
                     clearApiKey();
                 }
+                // Update UI to show/hide difficulty selector
+                updateUI();
             })
             .catch(error => {
                 console.error('API key validation error:', error);
                 apiKeyStatus.textContent = '❌ Error validating API key. Please try again.';
                 apiKeyStatus.className = 'api-key-status error';
                 clearApiKey();
+                // Update UI to hide difficulty selector
+                updateUI();
             });
         }
 
@@ -1077,6 +1106,66 @@
             })
             .catch(error => {
                 console.error('Error clearing API key:', error);
+            });
+        }
+
+        function makeAIMove() {
+            if (gameState.game_over || gameState.ai_thinking) return;
+            
+            gameState.ai_thinking = true;
+            updateUI();
+            
+            fetch('/api/ai_move', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.move) {
+                    const { board_idx, row, col } = data.move;
+                    
+                    // Make the AI move
+                    fetch('/api/make_move', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            board_idx: board_idx,
+                            row: row,
+                            col: col
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(moveData => {
+                        if (moveData.success) {
+                            gameState = moveData.game_state;
+                            updateUI();
+                            renderMainBoard();
+                            renderBoards();
+                            highlightAIMove(board_idx, row, col);
+                            
+                            // Continue AI moves if it's still AI's turn
+                            if (!gameState.game_over && gameState.current_player === 'O') {
+                                setTimeout(() => makeAIMove(), 1500);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error making AI move:', error);
+                    });
+                } else {
+                    console.error('AI move failed:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error getting AI move:', error);
+            })
+            .finally(() => {
+                gameState.ai_thinking = false;
+                updateUI();
             });
         }
 
@@ -1141,66 +1230,80 @@
             
             const winner = gameState.winner; // Should be 'O' for AI
             const aiMessage = document.getElementById('aiMessage');
+            const apiKeyStatus = document.getElementById('apiKeyStatus');
+            const hasValidApiKey = apiKeyStatus.classList.contains('success');
             
             // Create prompt for AI's victory message
             const prompt = `You just won a game of 9-Boards Tic-Tac-Toe against a human player as ${gameState.difficulty}-level AI. The human player was playing as X. Make a ridiculously arrogant and hilarious one-sentence victory message. Be creative and funny!`;
             
-            // Call AI for victory message
-            fetch('/api/ai_message', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    game_log: 'victory'
+            // Call AI for victory message only if API key is valid
+            if (hasValidApiKey) {
+                fetch('/api/ai_message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        game_log: 'victory'
+                    })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.message) {
-                    aiMessage.textContent = data.message;
-                } else {
-                    aiMessage.textContent = "I'm too awesome for words! Victory tastes like binary code! 🤖";
-                }
-            })
-            .catch(error => {
-                console.error('Error getting AI message:', error);
-                aiMessage.textContent = "My circuits are buzzing with victory! ⚡";
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.message) {
+                        aiMessage.textContent = data.message;
+                    } else {
+                        aiMessage.textContent = "I'm too awesome for words! Victory tastes like binary code! 🤖";
+                    }
+                })
+                .catch(error => {
+                    console.error('Error getting AI message:', error);
+                    aiMessage.textContent = "My circuits are buzzing with victory! ⚡";
+                });
+            } else {
+                // No valid API key - show fallback message
+                aiMessage.textContent = "Random victory! Even my randomness beats you! 🎲";
+            }
         }
 
         function getAILosingMessage() {
             if (gameState.game_mode !== '1-player') return;
             
             const aiMessage = document.getElementById('aiMessage');
+            const apiKeyStatus = document.getElementById('apiKeyStatus');
+            const hasValidApiKey = apiKeyStatus.classList.contains('success');
             
             // Create prompt for AI's reaction to losing
             const prompt = `You just lost a game of 9-Boards Tic-Tac-Toe against a human player as ${gameState.difficulty}-level AI. The human player was playing as X and won the game. Make a ridiculously arrogant but hilarious one-sentence message about how this was impossible or you let them win. Be creative and funny!`;
             
-            // Call AI for losing message
-            fetch('/api/ai_message', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    game_log: 'defeat'
+            // Call AI for losing message only if API key is valid
+            if (hasValidApiKey) {
+                fetch('/api/ai_message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        game_log: 'defeat'
+                    })
                 })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.message) {
-                    aiMessage.textContent = data.message;
-                } else {
-                    aiMessage.textContent = "This must be a glitch in the matrix! I demand a rematch! 🤖";
-                }
-            })
-            .catch(error => {
-                console.error('Error getting AI message:', error);
-                aiMessage.textContent = "My algorithms are recalculating... for revenge! 🔥";
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.message) {
+                        aiMessage.textContent = data.message;
+                    } else {
+                        aiMessage.textContent = "This must be a glitch in the matrix! I demand a rematch! 🤖";
+                    }
+                })
+                .catch(error => {
+                    console.error('Error getting AI message:', error);
+                    aiMessage.textContent = "My algorithms are recalculating... for revenge! 🔥";
+                });
+            } else {
+                // No valid API key - show fallback message
+                aiMessage.textContent = "Random defeat! My randomness needs an upgrade! 🎲";
+            }
         }
 
         // Close modal when clicking outside the modal content

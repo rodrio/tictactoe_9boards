@@ -60,6 +60,7 @@ A web-based implementation of Tic-Tac-Toe with a 9-boards structure, built with 
    - Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
    - In 1-player mode, enter your API key in the provided field (optional)
    - Click "🔑 Validate Key" to test your API key
+   - **Model**: Uses `gemini-3.1-flash-lite-preview` for optimal performance
    - **Security**: API keys are stored in memory only and never saved to files
    - **No Key**: If left blank, AI will use random moves as fallback
    - **Invalid Key**: System will show error and fallback to random moves
