@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe 9-Boards</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .game-info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .current-player {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .game-status {
+            margin-top: 10px;
+            font-size: 1.1em;
+        }
+
+        .winner {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .draw {
+            color: #ffc107;
+            font-weight: bold;
+        }
+
+        .main-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+            max-width: 600px;
+            margin: 0 auto 20px;
+        }
+
+        .main-cell {
+            aspect-ratio: 1;
+            border: 3px solid #ddd;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            font-weight: bold;
+            background: #f8f9fa;
+            position: relative;
+        }
+
+        .main-cell.won-x {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #28a745;
+        }
+
+        .main-cell.won-o {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+
+        .main-cell.draw {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .boards-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .board {
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 5px;
+            background: white;
+        }
+
+        .board.won-x {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .board.won-o {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .board.draw {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            background: white;
+            transition: all 0.2s ease;
+        }
+
+        .cell:hover:not(.occupied) {
+            background: #e9ecef;
+            transform: scale(1.05);
+        }
+
+        .cell.occupied {
+            cursor: not-allowed;
+        }
+
+        .cell.x {
+            color: #28a745;
+        }
+
+        .cell.o {
+            color: #dc3545;
+        }
+
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .instructions {
+            text-align: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 10px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .boards-container {
+                gap: 10px;
+            }
+            
+            .cell {
+                font-size: 1.2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Tic-Tac-Toe 9-Boards</h1>
+        
+        <div class="game-info">
+            <div class="current-player">Current Player: <span id="currentPlayer">X</span></div>
+            <div class="game-status" id="gameStatus">Game in progress</div>
+        </div>
+
+        <div class="main-board" id="mainBoard">
+            <!-- Main board cells will be generated by JavaScript -->
+        </div>
+
+        <div class="boards-container" id="boardsContainer">
+            <!-- 9 individual boards will be generated by JavaScript -->
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="resetGame()">🔄 New Game</button>
+        </div>
+
+        <div class="instructions">
+            <strong>How to play:</strong> Click any cell in any of the 9 boards to place your mark. 
+            Win an individual board to claim that space in the main board. 
+            Win three in a row on the main board to win the game!
+        </div>
+    </div>
+
+    <script>
+        let gameState = null;
+
+        function initializeGame() {
+            fetchGameState();
+            renderMainBoard();
+            renderBoards();
+        }
+
+        function fetchGameState() {
+            fetch('/api/game_state')
+                .then(response => response.json())
+                .then(data => {
+                    gameState = data;
+                    updateUI();
+                });
+        }
+
+        function updateUI() {
+            document.getElementById('currentPlayer').textContent = gameState.current_player;
+            
+            const statusElement = document.getElementById('gameStatus');
+            if (gameState.game_over) {
+                if (gameState.winner === 'Draw') {
+                    statusElement.innerHTML = '<span class="draw">Game Draw! 🤝</span>';
+                } else {
+                    statusElement.innerHTML = `<span class="winner">Player ${gameState.winner} Wins! 🎉</span>`;
+                }
+            } else {
+                statusElement.textContent = 'Game in progress';
+            }
+        }
+
+        function renderMainBoard() {
+            const mainBoard = document.getElementById('mainBoard');
+            mainBoard.innerHTML = '';
+            
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'main-cell';
+                    
+                    const boardIdx = row * 3 + col;
+                    const value = gameState.main_board[row][col];
+                    
+                    if (value === 'X') {
+                        cell.textContent = 'X';
+                        cell.className += ' won-x';
+                    } else if (value === 'O') {
+                        cell.textContent = 'O';
+                        cell.className += ' won-o';
+                    } else if (value === 'D') {
+                        cell.textContent = 'D';
+                        cell.className += ' draw';
+                    }
+                    
+                    mainBoard.appendChild(cell);
+                }
+            }
+        }
+
+        function renderBoards() {
+            const container = document.getElementById('boardsContainer');
+            container.innerHTML = '';
+            
+            for (let boardIdx = 0; boardIdx < 9; boardIdx++) {
+                const board = document.createElement('div');
+                board.className = 'board';
+                
+                // Check if this board has a winner
+                const boardWinner = getBoardWinner(boardIdx);
+                if (boardWinner === 'X') {
+                    board.className += ' won-x';
+                } else if (boardWinner === 'O') {
+                    board.className += ' won-o';
+                } else if (boardWinner === 'D') {
+                    board.className += ' draw';
+                }
+                
+                const grid = document.createElement('div');
+                grid.className = 'board-grid';
+                
+                for (let row = 0; row < 3; row++) {
+                    for (let col = 0; col < 3; col++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        
+                        const value = gameState.boards[boardIdx][row][col];
+                        if (value) {
+                            cell.textContent = value;
+                            cell.className += ` occupied ${value.toLowerCase()}`;
+                        }
+                        
+                        cell.onclick = () => makeMove(boardIdx, row, col);
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                board.appendChild(grid);
+                container.appendChild(board);
+            }
+        }
+
+        function getBoardWinner(boardIdx) {
+            const board = gameState.boards[boardIdx];
+            
+            // Check rows
+            for (let row = 0; row < 3; row++) {
+                if (board[row][0] && board[row][0] === board[row][1] && board[row][1] === board[row][2]) {
+                    return board[row][0];
+                }
+            }
+            
+            // Check columns
+            for (let col = 0; col < 3; col++) {
+                if (board[0][col] && board[0][col] === board[1][col] && board[1][col] === board[2][col]) {
+                    return board[0][col];
+                }
+            }
+            
+            // Check diagonals
+            if (board[0][0] && board[0][0] === board[1][1] && board[1][1] === board[2][2]) {
+                return board[0][0];
+            }
+            if (board[0][2] && board[0][2] === board[1][1] && board[1][1] === board[2][0]) {
+                return board[0][2];
+            }
+            
+            // Check for draw
+            let isFull = true;
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    if (!board[row][col]) {
+                        isFull = false;
+                        break;
+                    }
+                }
+            }
+            
+            return isFull ? 'D' : null;
+        }
+
+        function makeMove(boardIdx, row, col) {
+            if (gameState.game_over) {
+                return;
+            }
+            
+            if (gameState.boards[boardIdx][row][col] !== '') {
+                return;
+            }
+            
+            fetch('/api/make_move', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    board_idx: boardIdx,
+                    row: row,
+                    col: col
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    gameState = data.game_state;
+                    updateUI();
+                    renderMainBoard();
+                    renderBoards();
+                }
+            });
+        }
+
+        function resetGame() {
+            fetch('/api/reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                gameState = data.game_state;
+                updateUI();
+                renderMainBoard();
+                renderBoards();
+            });
+        }
+
+        // Initialize the game when the page loads
+        document.addEventListener('DOMContentLoaded', initializeGame);
+    </script>
+</body>
+</html>
