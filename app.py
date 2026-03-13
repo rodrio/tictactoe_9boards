@@ -1,7 +1,18 @@
 from flask import Flask, render_template, jsonify, request
 import json
+import os
+from google import genai
 
 app = Flask(__name__)
+
+# Configure Gemini API
+try:
+    genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+    model = genai.GenerativeModel('gemini-1.5-flash-lite-preview-0617')
+    AI_ENABLED = True
+except Exception as e:
+    print(f"Warning: Gemini API not configured. AI mode will be disabled. Error: {e}")
+    AI_ENABLED = False
 
 class TicTacToe9Boards:
     def __init__(self):
@@ -12,6 +23,8 @@ class TicTacToe9Boards:
         self.current_player = 'X'
         self.game_over = False
         self.winner = None
+        self.game_mode = '1-player'  # '1-player' or '2-players'
+        self.ai_thinking = False
         
     def make_move(self, board_idx, row, col):
         if self.game_over:
@@ -125,8 +138,129 @@ class TicTacToe9Boards:
             return 'D'
         return None
     
-    def reset_game(self):
-        self.__init__()
+    def reset_game(self, game_mode='1-player'):
+        self.game_mode = game_mode
+        self.boards = [[['' for _ in range(3)] for _ in range(3)] for _ in range(9)]
+        self.main_board = [['' for _ in range(3)] for _ in range(3)]
+        self.current_player = 'X'
+        self.game_over = False
+        self.winner = None
+        self.ai_thinking = False
+    
+    def set_game_mode(self, mode):
+        if mode in ['1-player', '2-players']:
+            self.game_mode = mode
+    
+    def is_ai_turn(self):
+        return self.game_mode == '1-player' and self.current_player == 'O' and not self.game_over
+    
+    def board_to_text(self):
+        """Convert the current board state to a text representation for the AI"""
+        text = "9-Boards Tic-Tac-Toe Current State:\n\n"
+        
+        # Main board status
+        text += "Main Board (shows winners of individual boards):\n"
+        for row in range(3):
+            row_text = ""
+            for col in range(3):
+                val = self.main_board[row][col]
+                if val == '':
+                    row_text += "[ ] "
+                elif val == 'D':
+                    row_text += "[D] "
+                else:
+                    row_text += f"[{val}] "
+            text += row_text.rstrip() + "\n"
+        
+        text += "\nIndividual Boards:\n"
+        for board_idx in range(9):
+            text += f"\nBoard {board_idx + 1} (Position {chr(65 + board_idx)}):\n"
+            board = self.boards[board_idx]
+            for row in board:
+                row_text = ""
+                for cell in row:
+                    if cell == '':
+                        row_text += ". "
+                    else:
+                        row_text += cell + " "
+                text += row_text.rstrip() + "\n"
+        
+        text += f"\nCurrent Player: {self.current_player}\n"
+        text += f"Game Mode: {self.game_mode}\n"
+        
+        return text
+    
+    def get_ai_move(self):
+        """Get AI move using Gemini API"""
+        if not AI_ENABLED:
+            # Fallback: make a random valid move
+            return self.get_random_move()
+        
+        try:
+            board_text = self.board_to_text()
+            
+            prompt = f"""
+You are playing 9-Boards Tic-Tac-Toe. Here are the rules:
+
+1. There are 9 individual 3x3 boards arranged in a 3x3 grid
+2. Players can place their mark (X or O) in any empty cell of any board
+3. Winning an individual board claims that position in the main board
+4. Winning 3 boards in a row on the main board wins the game
+5. You are playing as O, the current player
+
+Current board state:
+{board_text}
+
+Analyze the board and suggest the best move. Consider:
+- Winning individual boards
+- Blocking opponent from winning boards
+- Strategic positioning on the main board
+- Blocking opponent's main board wins
+
+Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2" for board 5, row 2, column 3)
+Make sure the chosen cell is empty (marked with "." in the individual boards).
+"""
+            
+            response = model.generate_content(prompt)
+            move_text = response.text.strip()
+            
+            # Parse the response
+            if ',' in move_text:
+                parts = move_text.split(',')
+                if len(parts) == 3:
+                    try:
+                        board_idx = int(parts[0])
+                        row = int(parts[1])
+                        col = int(parts[2])
+                        
+                        # Validate the move
+                        if (0 <= board_idx <= 8 and 0 <= row <= 2 and 0 <= col <= 2 and 
+                            self.boards[board_idx][row][col] == ''):
+                            return board_idx, row, col
+                    except ValueError:
+                        pass
+            
+            # If AI response is invalid, make a random move
+            return self.get_random_move()
+            
+        except Exception as e:
+            print(f"AI move error: {e}")
+            return self.get_random_move()
+    
+    def get_random_move(self):
+        """Fallback: make a random valid move"""
+        valid_moves = []
+        for board_idx in range(9):
+            for row in range(3):
+                for col in range(3):
+                    if self.boards[board_idx][row][col] == '':
+                        valid_moves.append((board_idx, row, col))
+        
+        if valid_moves:
+            import random
+            return random.choice(valid_moves)
+        
+        return None
 
 # Global game instance
 game = TicTacToe9Boards()
@@ -142,7 +276,10 @@ def get_game_state():
         'main_board': game.main_board,
         'current_player': game.current_player,
         'game_over': game.game_over,
-        'winner': game.winner
+        'winner': game.winner,
+        'game_mode': game.game_mode,
+        'ai_thinking': game.ai_thinking,
+        'ai_enabled': AI_ENABLED
     })
 
 @app.route('/api/make_move', methods=['POST'])
@@ -154,27 +291,84 @@ def make_move():
     
     success = game.make_move(board_idx, row, col)
     
-    return jsonify({
+    response_data = {
         'success': success,
         'game_state': {
             'boards': game.boards,
             'main_board': game.main_board,
             'current_player': game.current_player,
             'game_over': game.game_over,
-            'winner': game.winner
+            'winner': game.winner,
+            'game_mode': game.game_mode,
+            'ai_thinking': game.ai_thinking,
+            'ai_enabled': AI_ENABLED
         }
-    })
+    }
+    
+    # If it's AI's turn next and game is not over
+    if success and game.is_ai_turn():
+        game.ai_thinking = True
+        response_data['game_state']['ai_thinking'] = True
+        
+        # Make AI move
+        ai_move = game.get_ai_move()
+        if ai_move:
+            ai_board_idx, ai_row, ai_col = ai_move
+            game.make_move(ai_board_idx, ai_row, ai_col)
+            
+            response_data['ai_move'] = {
+                'board_idx': ai_board_idx,
+                'row': ai_row,
+                'col': ai_col
+            }
+            
+            # Update game state after AI move
+            response_data['game_state'] = {
+                'boards': game.boards,
+                'main_board': game.main_board,
+                'current_player': game.current_player,
+                'game_over': game.game_over,
+                'winner': game.winner,
+                'game_mode': game.game_mode,
+                'ai_thinking': False,
+                'ai_enabled': AI_ENABLED
+            }
+    
+    return jsonify(response_data)
 
 @app.route('/api/reset', methods=['POST'])
 def reset_game():
-    game.reset_game()
+    data = request.json or {}
+    game_mode = data.get('game_mode', '1-player')
+    game.reset_game(game_mode)
     return jsonify({
         'game_state': {
             'boards': game.boards,
             'main_board': game.main_board,
             'current_player': game.current_player,
             'game_over': game.game_over,
-            'winner': game.winner
+            'winner': game.winner,
+            'game_mode': game.game_mode,
+            'ai_thinking': game.ai_thinking,
+            'ai_enabled': AI_ENABLED
+        }
+    })
+
+@app.route('/api/set_game_mode', methods=['POST'])
+def set_game_mode():
+    data = request.json
+    game_mode = data.get('game_mode', '1-player')
+    game.set_game_mode(game_mode)
+    return jsonify({
+        'game_state': {
+            'boards': game.boards,
+            'main_board': game.main_board,
+            'current_player': game.current_player,
+            'game_over': game.game_over,
+            'winner': game.winner,
+            'game_mode': game.game_mode,
+            'ai_thinking': game.ai_thinking,
+            'ai_enabled': AI_ENABLED
         }
     })
 

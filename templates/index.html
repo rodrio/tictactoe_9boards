@@ -205,6 +205,68 @@
             transform: translateY(-2px);
         }
 
+        .game-mode-selector {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .mode-label {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+            font-size: 1.1em;
+        }
+
+        .mode-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mode-btn {
+            background: #e9ecef;
+            color: #666;
+            border: 2px solid #dee2e6;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .mode-btn:hover {
+            background: #dee2e6;
+            transform: translateY(-1px);
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .mode-btn.active:hover {
+            background: #5a6fd8;
+        }
+
+        .ai-status {
+            text-align: center;
+            font-size: 1.1em;
+            color: #667eea;
+            font-weight: bold;
+            margin-top: 10px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -352,8 +414,20 @@
         <h1>🎮 Tic-Tac-Toe 9-Boards</h1>
         
         <div class="game-info">
+            <div class="game-mode-selector">
+                <label class="mode-label">Game Mode:</label>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" id="mode1Player" onclick="setGameMode('1-player')">
+                        🤖 1-Player
+                    </button>
+                    <button class="mode-btn" id="mode2Players" onclick="setGameMode('2-players')">
+                        👥 2-Players
+                    </button>
+                </div>
+            </div>
             <div class="current-player">Current Player: <span id="currentPlayer">X</span></div>
             <div class="game-status" id="gameStatus">Game in progress</div>
+            <div class="ai-status" id="aiStatus" style="display: none;">🤔 AI is thinking...</div>
         </div>
 
         <div class="main-board" id="mainBoard">
@@ -470,15 +544,29 @@
         function updateUI() {
             document.getElementById('currentPlayer').textContent = gameState.current_player;
             
+            // Update game mode buttons
+            document.getElementById('mode1Player').classList.toggle('active', gameState.game_mode === '1-player');
+            document.getElementById('mode2Players').classList.toggle('active', gameState.game_mode === '2-players');
+            
+            // Update AI status
+            const aiStatus = document.getElementById('aiStatus');
+            if (gameState.ai_thinking) {
+                aiStatus.style.display = 'block';
+            } else {
+                aiStatus.style.display = 'none';
+            }
+            
             const statusElement = document.getElementById('gameStatus');
             if (gameState.game_over) {
                 if (gameState.winner === 'Draw') {
                     statusElement.innerHTML = '<span class="draw">Game Draw! 🤝</span>';
                 } else {
-                    statusElement.innerHTML = `<span class="winner">Player ${gameState.winner} Wins! 🎉</span>`;
+                    const winnerText = gameState.game_mode === '1-player' && gameState.winner === 'O' ? 'AI' : `Player ${gameState.winner}`;
+                    statusElement.innerHTML = `<span class="winner">${winnerText} Wins! 🎉</span>`;
                 }
             } else {
-                statusElement.textContent = 'Game in progress';
+                const currentPlayerText = gameState.game_mode === '1-player' && gameState.current_player === 'O' ? 'AI' : `Player ${gameState.current_player}`;
+                statusElement.textContent = `Game in progress - ${currentPlayerText}'s turn`;
             }
         }
 
@@ -592,7 +680,12 @@
         }
 
         function makeMove(boardIdx, row, col) {
-            if (gameState.game_over) {
+            if (gameState.game_over || gameState.ai_thinking) {
+                return;
+            }
+            
+            // In 1-player mode, only allow moves when it's X's turn (human player)
+            if (gameState.game_mode === '1-player' && gameState.current_player === 'O') {
                 return;
             }
             
@@ -618,16 +711,25 @@
                     updateUI();
                     renderMainBoard();
                     renderBoards();
+                    
+                    // If AI made a move, highlight it
+                    if (data.ai_move) {
+                        highlightAIMove(data.ai_move.board_idx, data.ai_move.row, data.ai_move.col);
+                    }
                 }
             });
         }
 
         function resetGame() {
+            const gameMode = gameState ? gameState.game_mode : '1-player';
             fetch('/api/reset', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify({
+                    game_mode: gameMode
+                })
             })
             .then(response => response.json())
             .then(data => {
@@ -636,6 +738,40 @@
                 renderMainBoard();
                 renderBoards();
             });
+        }
+
+        function setGameMode(mode) {
+            fetch('/api/set_game_mode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    game_mode: mode
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                gameState = data.game_state;
+                updateUI();
+                renderMainBoard();
+                renderBoards();
+            });
+        }
+
+        function highlightAIMove(boardIdx, row, col) {
+            // Find and highlight the AI's move
+            const boards = document.querySelectorAll('.board');
+            if (boards[boardIdx]) {
+                const cells = boards[boardIdx].querySelectorAll('.cell');
+                const cellIndex = row * 3 + col;
+                if (cells[cellIndex]) {
+                    cells[cellIndex].style.animation = 'pulse 1s ease-in-out 2';
+                    setTimeout(() => {
+                        cells[cellIndex].style.animation = '';
+                    }, 2000);
+                }
+            }
         }
 
         function showRules() {
