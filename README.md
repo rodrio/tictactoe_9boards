@@ -58,11 +58,11 @@ A web-based implementation of Tic-Tac-Toe with a 9-boards structure, built with 
 
 6. **(Optional) Set up AI Player**: 
    - Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-   - Create a `.env` file in the project root:
-     ```
-     GEMINI_API_KEY=your_actual_api_key_here
-     ```
-   - Without the API key, the AI will use random moves as fallback
+   - In 1-player mode, enter your API key in the provided field (optional)
+   - Click "🔑 Validate Key" to test your API key
+   - **Security**: API keys are stored in memory only and never saved to files
+   - **No Key**: If left blank, AI will use random moves as fallback
+   - **Invalid Key**: System will show error and fallback to random moves
 
 6. Run the application:
    ```bash
@@ -114,6 +114,45 @@ The application includes:
 - **New Game**: Click the "🔄 New Game" button to restart
 - **Rules**: Click "📖 Rules" to see detailed game instructions
 
+### Victory Celebrations
+- **Dynamic Modal**: Automatic victory celebration appears when game ends
+- **Context-Aware Messages**: Different content based on game mode and winner
+- **AI Interaction**: In 1-player mode, AI generates arrogant/hilarious post-game messages
+- **Entertaining**: AI provides unique victory and defeat reactions
+- **Visual Feedback**: Beautiful modal design with animations
+
+### API Key Management
+
+**🔑 Secure API Key System**
+- **In-Memory Storage**: API keys stored only during game session
+- **No File Persistence**: Keys never saved to disk or logs
+- **Real-Time Validation**: Test API key before using for AI moves
+- **Error Handling**: Clear messages for invalid keys, quota issues, rate limits
+- **Flexible Usage**: Can enter key anytime, change during gameplay
+- **Automatic Fallback**: Random moves when no valid key provided
+
+**How to Use**
+1. Select 1-player mode
+2. Enter your Gemini API key in the provided field (optional)
+3. Click "🔑 Validate Key" to test the key
+4. Green status = valid key, Red status = invalid key
+5. Leave blank for random moves only
+
+**Security Features**
+- Password field masks input
+- Keys stored in server memory only
+- No logging of API keys
+- Keys lost when game restarts
+- Session-based storage
+
+### AI Logging System
+- **Complete Tracking**: Every AI prompt and response logged with timestamps
+- **Game Moves**: All player moves recorded during AI games
+- **Error Handling**: Graceful API failures with fallback mechanisms
+- **File Management**: Automatic log clearing for new games
+- **Debugging Support**: Comprehensive audit trail in `ai_interactions.log`
+- **Game Certification**: Stops play on critical AI failures
+
 ### AI Features
 
 The AI opponent includes:
@@ -121,8 +160,12 @@ The AI opponent includes:
 - **Offensive Play**: Attempts to win individual boards and main game
 - **Defensive Play**: Blocks opponent's winning moves
 - **Board Priority**: Focuses on strategically important board positions
-- **Fallback Logic**: If API is unavailable, uses random valid moves
+- **API Key Management**: Secure in-memory API key storage with validation
+- **Fallback Logic**: If API key is invalid or missing, uses random valid moves
 - **Complete Logging**: All AI prompts and responses are logged to `ai_interactions.log`
+- **Error Handling**: Graceful fallbacks and proper error reporting
+- **Game Certification**: Stops game on critical AI failures
+- **Security-First**: API keys never saved to files, stored in memory only
 
 ### Difficulty Levels
 
@@ -162,12 +205,27 @@ tictactoe_9boards/
 - `GET /api/game_state` - Get current game state
 - `POST /api/make_move` - Make a move (expects JSON with board_idx, row, col)
 - `POST /api/reset` - Reset the game
+- `POST /api/set_game_mode` - Set game mode (1-player or 2-players)
+- `POST /api/set_difficulty` - Set AI difficulty (Noobie, Average, Expert)
+- `POST /api/validate_api_key` - Validate Gemini API key
+- `POST /api/set_api_key` - Set API key for AI (stored in memory only)
+- `POST /api/clear_api_key` - Clear API key from memory
+- `POST /api/ai_message` - Get AI post-game message
 
 ## Game Controls
 
-- Click any empty cell in any board to make a move
-- The current player is indicated at the top
-- Click "New Game" to reset and start over
+- **Game Mode Selection**: Click mode buttons to switch between 1-player and 2-players
+- **API Key Management**: In 1-player mode, enter and validate Gemini API key (optional)
+- **Difficulty Selection**: Choose AI difficulty level (Noobie, Average, Expert)
+- **Making Moves**: Click any empty cell in any board to place your mark
+- **New Game**: Click "🔄 New Game" button to reset and start over
+- **Rules**: Click "📖 Rules" to see detailed game instructions
+
+### API Key Controls
+- **Enter Key**: Type your Gemini API key in the password field
+- **Validate Key**: Click "🔑 Validate Key" to test API key validity
+- **Status Indicators**: Green = valid, Red = invalid, Blue = info
+- **Clear Key**: Leave field blank or clear to use random moves only
 
 ## Technologies Used
 

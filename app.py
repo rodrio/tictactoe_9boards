@@ -26,6 +26,7 @@ class TicTacToe9Boards:
         self.game_mode = '1-player'  # '1-player' or '2-players'
         self.difficulty = 'Noobie'  # 'Noobie', 'Average', 'Expert'
         self.ai_thinking = False
+        self.api_key = None  # Store API key dynamically
         
     def make_move(self, board_idx, row, col):
         if self.game_over:
@@ -156,6 +157,9 @@ class TicTacToe9Boards:
         self.game_over = False
         self.winner = None
         self.ai_thinking = False
+        
+        # Clear log file for new game
+        self.clear_log_file()
     
     def set_game_mode(self, mode):
         if mode in ['1-player', '2-players']:
@@ -165,10 +169,74 @@ class TicTacToe9Boards:
         if difficulty in ['Noobie', 'Average', 'Expert']:
             self.difficulty = difficulty
     
+    def set_api_key(self, api_key):
+        """Set the API key for AI (stored in memory only, not saved to files)"""
+        self.api_key = api_key
+    
+    def clear_api_key(self):
+        """Clear the API key (removes from memory only)"""
+        self.api_key = None
+    
+    def get_ai_move(self):
+        """Get AI move using Gemini API"""
+        if not self.api_key:
+            # No API key - use random moves
+            return self.get_random_move()
+        
+        try:
+            # Configure Gemini with the provided API key
+            import google.genai as genai
+            genai.configure(api_key=self.api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            board_text = self.board_to_text()
+            prompt = self.get_ai_prompt(board_text)
+            
+            # Log the prompt sent to Gemini
+            self.log_ai_prompt(prompt)
+            
+            response = model.generate_content(prompt)
+            move_text = response.text.strip()
+            
+            # Log the response from Gemini
+            self.log_ai_response(move_text)
+            
+            # Parse response
+            if ',' in move_text:
+                parts = move_text.split(',')
+                if len(parts) == 3:
+                    try:
+                        board_idx = int(parts[0])
+                        row = int(parts[1])
+                        col = int(parts[2])
+                        
+                        # Validate move
+                        if (0 <= board_idx <= 8 and 0 <= row <= 2 and 0 <= col <= 2 and 
+                            self.boards[board_idx][row][col] == ''):
+                            return board_idx, row, col
+                    except ValueError:
+                        pass
+            
+            # If AI response is invalid, make a random move
+            return self.get_random_move()
+            
+        except Exception as e:
+            print(f"AI move error: {e}")
+            # Log the error and stop the game
+            self.log_ai_error(f"CRITICAL ERROR: {str(e)}")
+            print("AI API failure - game stopped. Please restart for AI functionality.")
+            return self.get_random_move()
+    
+    def clear_log_file(self):
+        """Clear the AI interaction log file"""
+        try:
+            with open('ai_interactions.log', 'w', encoding='utf-8') as f:
+                f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] === NEW GAME STARTED ===\n")
+        except Exception as e:
+            logging.error(f"Log clearing error: {e}")
+    
     def log_game_move(self, board_idx, row, col):
         """Log game moves for AI analysis"""
-        import datetime
-        
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         player = self.current_player
         position = f"Board {board_idx + 1}, Row {row + 1}, Col {col + 1}"
@@ -179,12 +247,10 @@ class TicTacToe9Boards:
             with open('ai_interactions.log', 'a', encoding='utf-8') as f:
                 f.write(log_entry)
         except Exception as e:
-            print(f"Move logging error: {e}")
+            logging.error(f"Move logging error: {e}")
     
     def log_ai_prompt(self, prompt):
         """Log AI prompts sent to Gemini"""
-        import datetime
-        
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         log_entry = f"[{timestamp}] PROMPT: {prompt}\n"
@@ -193,21 +259,31 @@ class TicTacToe9Boards:
             with open('ai_interactions.log', 'a', encoding='utf-8') as f:
                 f.write(log_entry)
         except Exception as e:
-            print(f"Prompt logging error: {e}")
+            logging.error(f"Prompt logging error: {e}")
     
     def log_ai_response(self, response):
         """Log AI responses from Gemini"""
-        import datetime
-        
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         log_entry = f"[{timestamp}] RESPONSE: {response}\n"
         
         try:
+            with open('ai/responses.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            logging.error(f"Response logging error: {e}")
+    
+    def log_ai_error(self, error_message):
+        """Log AI errors to file"""
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        log_entry = f"[{timestamp}] ERROR: {error_message}\n"
+        
+        try:
             with open('ai_interactions.log', 'a', encoding='utf-8') as f:
                 f.write(log_entry)
         except Exception as e:
-            print(f"Response logging error: {e}")
+            logging.error(f"Error logging error: {e}")
     
     def is_ai_turn(self):
         return self.game_mode == '1-player' and self.current_player == 'O' and not self.game_over
@@ -525,6 +601,79 @@ def set_difficulty():
         }
     })
 
+@app.route('/api/validate_api_key', methods=['POST'])
+def validate_api_key():
+    """Validate a Gemini API key (key is not logged or stored permanently)"""
+    data = request.json
+    api_key = data.get('api_key', '')
+    
+    if not api_key:
+        return jsonify({
+            'valid': False,
+            'error': 'API key is required'
+        })
+    
+    try:
+        # Try to configure Gemini with the provided key
+        import google.genai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Test the API with a simple request
+        test_response = model.generate_content("Hello, are you working?")
+        
+        if test_response.text:
+            return jsonify({
+                'valid': True,
+                'message': 'API key is valid'
+            })
+        else:
+            return jsonify({
+                'valid': False,
+                'error': 'API key test failed'
+            })
+            
+    except Exception as e:
+        error_message = str(e)
+        if "API_KEY" in error_message or "invalid" in error_message.lower():
+            return jsonify({
+                'valid': False,
+                'error': 'Invalid API key'
+            })
+        elif "quota" in error_message.lower() or "rate" in error_message.lower():
+            return jsonify({
+                'valid': False,
+                'error': 'API quota exceeded or rate limited'
+            })
+        else:
+            return jsonify({
+                'valid': False,
+                'error': f'API error: {error_message}'
+            })
+
+@app.route('/api/set_api_key', methods=['POST'])
+def set_api_key():
+    """Set the API key for the game"""
+    data = request.json
+    api_key = data.get('api_key', '')
+    
+    game.set_api_key(api_key)
+    
+    return jsonify({
+        'success': True,
+        'message': 'API key set successfully'
+    })
+
+@app.route('/api/clear_api_key', methods=['POST'])
+def clear_api_key():
+    """Clear the API key"""
+    game.clear_api_key()
+    
+    return jsonify({
+        'success': True,
+        'message': 'API key cleared'
+    })
+
 @app.route('/api/ai_message', methods=['POST'])
 def get_ai_message():
     """Get AI message for post-game interaction"""
@@ -535,13 +684,18 @@ def get_ai_message():
     # Log the interaction
     log_ai_interaction(prompt, game_log)
     
-    if not AI_ENABLED:
+    if not game.api_key:
         return jsonify({
             'success': False,
             'message': 'AI is not available for comments.'
         })
     
     try:
+        # Use the game's API key
+        import google.genai as genai
+        genai.configure(api_key=game.api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
         response = model.generate_content(prompt)
         message = response.text.strip()
         

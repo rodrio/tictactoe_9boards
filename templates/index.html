@@ -300,6 +300,59 @@
             background: #218838;
         }
 
+        .api-key-section {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .api-key-input-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .api-key-input {
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 0.9em;
+            width: 300px;
+            transition: border-color 0.3s ease;
+        }
+
+        .api-key-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .api-key-status {
+            font-size: 0.85em;
+            margin-top: 5px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .api-key-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .api-key-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .api-key-status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.6; }
@@ -512,6 +565,16 @@
                     </button>
                 </div>
             </div>
+            <div class="api-key-section" id="apiKeySection" style="display: none;">
+                <label class="mode-label">Gemini API Key (Optional):</label>
+                <div class="api-key-input-group">
+                    <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key..." class="api-key-input">
+                    <button class="btn-secondary" id="validateKeyBtn" onclick="validateApiKey()">
+                        🔑 Validate Key
+                    </button>
+                </div>
+                <div class="api-key-status" id="apiKeyStatus"></div>
+            </div>
             <div class="current-player">Current Player: <span id="currentPlayer">X</span></div>
             <div class="game-status" id="gameStatus">Game in progress</div>
             <div class="ai-status" id="aiStatus" style="display: none;">🤔 AI is thinking...</div>
@@ -664,10 +727,14 @@
             
             // Show/hide difficulty selector based on game mode
             const difficultySelector = document.getElementById('difficultySelector');
+            const apiKeySection = document.getElementById('apiKeySection');
+            
             if (gameState.game_mode === '1-player') {
                 difficultySelector.style.display = 'block';
+                apiKeySection.style.display = 'block';
             } else {
                 difficultySelector.style.display = 'none';
+                apiKeySection.style.display = 'none';
             }
             
             // Update difficulty buttons
@@ -925,6 +992,91 @@
                 updateUI();
                 renderMainBoard();
                 renderBoards();
+            });
+        }
+
+        function validateApiKey() {
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const apiKeyStatus = document.getElementById('apiKeyStatus');
+            const apiKey = apiKeyInput.value.trim();
+            
+            if (!apiKey) {
+                // Empty key - use random moves
+                apiKeyStatus.textContent = 'No API key provided - AI will use random moves';
+                apiKeyStatus.className = 'api-key-status info';
+                // Clear the API key on backend
+                clearApiKey();
+                return;
+            }
+            
+            // Show loading state
+            apiKeyStatus.textContent = 'Validating API key...';
+            apiKeyStatus.className = 'api-key-status info';
+            
+            // Validate the API key
+            fetch('/api/validate_api_key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    api_key: apiKey
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.valid) {
+                    apiKeyStatus.textContent = '✅ API key is valid! AI will use Gemini model';
+                    apiKeyStatus.className = 'api-key-status success';
+                    // Store the valid API key
+                    setApiKey(apiKey);
+                } else {
+                    apiKeyStatus.textContent = `❌ Invalid API key: ${data.error}`;
+                    apiKeyStatus.className = 'api-key-status error';
+                    // Clear the API key on backend
+                    clearApiKey();
+                }
+            })
+            .catch(error => {
+                console.error('API key validation error:', error);
+                apiKeyStatus.textContent = '❌ Error validating API key. Please try again.';
+                apiKeyStatus.className = 'api-key-status error';
+                clearApiKey();
+            });
+        }
+
+        function setApiKey(apiKey) {
+            fetch('/api/set_api_key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    api_key: apiKey
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('API key set successfully');
+            })
+            .catch(error => {
+                console.error('Error setting API key:', error);
+            });
+        }
+
+        function clearApiKey() {
+            fetch('/api/clear_api_key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('API key cleared');
+            })
+            .catch(error => {
+                console.error('Error clearing API key:', error);
             });
         }
 
