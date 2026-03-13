@@ -28,10 +28,18 @@ class TicTacToe9Boards:
         self.ai_thinking = False
         self.api_key = None  # Store API key dynamically
         self.last_error = None
+        self.turn_start_time = None  # Track when current turn started
+        self.time_limit = 10  # 10 seconds per turn
         
     def make_move(self, board_idx, row, col):
         if self.game_over:
             self.last_error = "Game is over"
+            return False
+        
+        # Check if turn has timed out
+        if self.turn_start_time and self.is_turn_timed_out():
+            self.last_error = "Turn timed out"
+            self.switch_player()  # Lose turn due to timeout
             return False
             
         board_row = board_idx // 3
@@ -79,7 +87,7 @@ class TicTacToe9Boards:
             self.winner = 'Draw'
         
         # Switch player
-        self.current_player = 'O' if self.current_player == 'X' else 'X'
+        self.switch_player()
         self.last_error = None
         return True
     
@@ -167,6 +175,7 @@ class TicTacToe9Boards:
         self.game_over = False
         self.winner = None
         self.ai_thinking = False
+        self.turn_start_time = None
         
         # Clear log file for new game
         self.clear_log_file()
@@ -263,9 +272,11 @@ As a Noobie player:
 - Block obvious opponent wins
 - Remember: won/drawn boards are permanently closed
 - Don't overthink - make reasonable moves
+- **CRITICAL**: You must respond in less than 9 seconds to avoid timeout
 
 Analyze the board and suggest your best move. Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2")
 Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
+Respond quickly - you have less than 9 seconds!
 """
         
         elif self.difficulty == 'Average':
@@ -290,9 +301,11 @@ As an Average player:
 - Consider the strategic importance of board positions on the main 3x3 board
 - Plan ahead for main board victories
 - Remember: won/drawn boards are permanently closed - Balance offensive and defensive strategies
+- **CRITICAL**: You must respond in less than 9 seconds to avoid timeout
 
 Analyze the board and suggest your best strategic move. Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2")
 Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
+Respond quickly - you have less than 9 seconds!
 """
         
         else:  # Expert
@@ -451,6 +464,30 @@ Make sure the chosen cell is empty (marked with "." in the individual boards) AN
         text += f"Game Mode: {self.game_mode}\n"
         
         return text
+    
+    def switch_player(self):
+        """Switch current player and reset turn timer"""
+        self.current_player = 'O' if self.current_player == 'X' else 'X'
+        self.turn_start_time = datetime.datetime.now()
+    
+    def is_turn_timed_out(self):
+        """Check if current turn has exceeded time limit"""
+        if not self.turn_start_time:
+            return False
+        elapsed = datetime.datetime.now() - self.turn_start_time
+        return elapsed.total_seconds() > self.time_limit
+    
+    def get_remaining_time(self):
+        """Get remaining time for current turn in seconds"""
+        if not self.turn_start_time:
+            return self.time_limit
+        elapsed = datetime.datetime.now() - self.turn_start_time
+        remaining = self.time_limit - elapsed.total_seconds()
+        return max(0, remaining)
+    
+    def start_turn(self):
+        """Start timing the current turn"""
+        self.turn_start_time = datetime.datetime.now()
 
 # Global game instance
 game = TicTacToe9Boards()
@@ -475,7 +512,19 @@ def get_game_state():
         'game_mode': game.game_mode,
         'difficulty': game.difficulty,
         'ai_thinking': game.ai_thinking,
-        'ai_enabled': AI_ENABLED
+        'ai_enabled': AI_ENABLED,
+        'remaining_time': game.get_remaining_time(),
+        'time_limit': game.time_limit
+    })
+
+@app.route('/api/start_turn', methods=['POST'])
+def start_turn():
+    """Start timing the current turn"""
+    game.start_turn()
+    game_state = game.get_game_state()
+    game_state['ai_enabled'] = AI_ENABLED
+    return jsonify({
+        'game_state': game_state
     })
 
 @app.route('/api/make_move', methods=['POST'])
@@ -552,6 +601,7 @@ def reset_game():
     difficulty = data.get('difficulty', 'Noobie')
     
     game.reset_game(game_mode, difficulty)
+    game.start_turn()  # Start timing for first turn
     game_state = game.get_game_state()
     game_state['ai_enabled'] = AI_ENABLED
     return jsonify({
