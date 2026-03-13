@@ -24,6 +24,7 @@ class TicTacToe9Boards:
         self.game_over = False
         self.winner = None
         self.game_mode = '1-player'  # '1-player' or '2-players'
+        self.difficulty = 'Noobie'  # 'Noobie', 'Average', 'Expert'
         self.ai_thinking = False
         
     def make_move(self, board_idx, row, col):
@@ -33,13 +34,21 @@ class TicTacToe9Boards:
         board_row = board_idx // 3
         board_col = board_idx % 3
         
-        # Check if the move is valid
+        # Check if move is valid
         if self.boards[board_idx][row][col] != '':
+            return False
+        
+        # Check if board is already won or drawn (closed)
+        if self.main_board[board_row][board_col] != '':
             return False
             
         # Make the move
         self.boards[board_idx][row][col] = self.current_player
         
+        # Log the move for AI games
+        if self.game_mode == '1-player':
+            self.log_game_move(board_idx, row, col)
+            
         # Check if this move wins the individual board
         if self.check_board_winner(board_idx):
             self.main_board[board_row][board_col] = self.current_player
@@ -138,8 +147,9 @@ class TicTacToe9Boards:
             return 'D'
         return None
     
-    def reset_game(self, game_mode='1-player'):
+    def reset_game(self, game_mode='1-player', difficulty='Noobie'):
         self.game_mode = game_mode
+        self.difficulty = difficulty
         self.boards = [[['' for _ in range(3)] for _ in range(3)] for _ in range(9)]
         self.main_board = [['' for _ in range(3)] for _ in range(3)]
         self.current_player = 'X'
@@ -150,6 +160,54 @@ class TicTacToe9Boards:
     def set_game_mode(self, mode):
         if mode in ['1-player', '2-players']:
             self.game_mode = mode
+    
+    def set_difficulty(self, difficulty):
+        if difficulty in ['Noobie', 'Average', 'Expert']:
+            self.difficulty = difficulty
+    
+    def log_game_move(self, board_idx, row, col):
+        """Log game moves for AI analysis"""
+        import datetime
+        
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        player = self.current_player
+        position = f"Board {board_idx + 1}, Row {row + 1}, Col {col + 1}"
+        
+        log_entry = f"[{timestamp}] MOVE: {player} played at {position}\n"
+        
+        try:
+            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            print(f"Move logging error: {e}")
+    
+    def log_ai_prompt(self, prompt):
+        """Log AI prompts sent to Gemini"""
+        import datetime
+        
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        log_entry = f"[{timestamp}] PROMPT: {prompt}\n"
+        
+        try:
+            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            print(f"Prompt logging error: {e}")
+    
+    def log_ai_response(self, response):
+        """Log AI responses from Gemini"""
+        import datetime
+        
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        log_entry = f"[{timestamp}] RESPONSE: {response}\n"
+        
+        try:
+            with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+                f.write(log_entry)
+        except Exception as e:
+            print(f"Response logging error: {e}")
     
     def is_ai_turn(self):
         return self.game_mode == '1-player' and self.current_player == 'O' and not self.game_over
@@ -198,33 +256,18 @@ class TicTacToe9Boards:
         
         try:
             board_text = self.board_to_text()
+            prompt = self.get_ai_prompt(board_text)
             
-            prompt = f"""
-You are playing 9-Boards Tic-Tac-Toe. Here are the rules:
-
-1. There are 9 individual 3x3 boards arranged in a 3x3 grid
-2. Players can place their mark (X or O) in any empty cell of any board
-3. Winning an individual board claims that position in the main board
-4. Winning 3 boards in a row on the main board wins the game
-5. You are playing as O, the current player
-
-Current board state:
-{board_text}
-
-Analyze the board and suggest the best move. Consider:
-- Winning individual boards
-- Blocking opponent from winning boards
-- Strategic positioning on the main board
-- Blocking opponent's main board wins
-
-Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2" for board 5, row 2, column 3)
-Make sure the chosen cell is empty (marked with "." in the individual boards).
-"""
+            # Log the prompt sent to Gemini
+            self.log_ai_prompt(prompt)
             
             response = model.generate_content(prompt)
             move_text = response.text.strip()
             
-            # Parse the response
+            # Log the response from Gemini
+            self.log_ai_response(move_text)
+            
+            # Parse response
             if ',' in move_text:
                 parts = move_text.split(',')
                 if len(parts) == 3:
@@ -233,7 +276,7 @@ Make sure the chosen cell is empty (marked with "." in the individual boards).
                         row = int(parts[1])
                         col = int(parts[2])
                         
-                        # Validate the move
+                        # Validate move
                         if (0 <= board_idx <= 8 and 0 <= row <= 2 and 0 <= col <= 2 and 
                             self.boards[board_idx][row][col] == ''):
                             return board_idx, row, col
@@ -246,6 +289,91 @@ Make sure the chosen cell is empty (marked with "." in the individual boards).
         except Exception as e:
             print(f"AI move error: {e}")
             return self.get_random_move()
+    
+    def get_ai_prompt(self, board_text):
+        """Generate AI prompt based on difficulty level"""
+        
+        if self.difficulty == 'Noobie':
+            return f"""
+You are a Noobie-level 9-Boards Tic-Tac-Toe player. You are still learning the game but understand the basics.
+
+GAME RULES:
+1. This is NOT regular tic-tac-toe - it's 9 individual 3x3 boards arranged in a 3x3 grid
+2. Players can place their mark (X or O) in any empty cell of any board
+3. When a player wins an individual board, that board's position in the main board gets marked with their symbol
+4. **IMPORTANT**: Once a board is won or drawn, it CLOSES permanently - no more moves can be made in that board
+5. The ULTIMATE GOAL is to win 3 boards in a row on the main board
+6. You are playing as O, and it's your turn now
+
+Current board state:
+{board_text}
+
+As a Noobie player:
+- Focus on making simple, safe moves
+- Try to win individual boards when possible
+- Block obvious opponent wins
+- Remember: won/drawn boards are permanently closed
+- Don't overthink - make reasonable moves
+
+Analyze the board and suggest your best move. Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2")
+Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
+"""
+        
+        elif self.difficulty == 'Average':
+            return f"""
+You are an Average-level 9-Boards Tic-Tac-Toe player. You understand the game well and can play strategically.
+
+GAME RULES:
+1. This is 9 individual 3x3 boards arranged in a 3x3 grid (NOT regular tic-tac-toe)
+2. Players can place their mark (X or O) in any empty cell of any board
+3. Winning an individual board claims that position in the main board
+4. **CRITICAL**: Once a board is won or drawn, it CLOSES permanently - no further moves allowed in that board
+5. The ULTIMATE GOAL is to win 3 boards in a row on the main board
+6. You are playing as O, and it's your turn now
+
+Current board state:
+{board_text}
+
+As an Average player:
+- Balance offensive and defensive strategies
+- Look for opportunities to win individual boards
+- Block opponent's winning moves on individual boards
+- Consider the strategic importance of board positions on the main board
+- Plan ahead for main board victories
+- Remember: closed boards are off-limits
+
+Analyze the board and suggest your best strategic move. Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2")
+Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
+"""
+        
+        else:  # Expert
+            return f"""
+You are an Expert-level 9-Boards Tic-Tac-Toe player. You master the game's complexity and play at the highest level.
+
+GAME RULES:
+1. This is 9 individual 3x3 boards arranged in a 3x3 grid - a multi-layered strategic game
+2. Players can place their mark (X or O) in any empty cell of any board
+3. Winning an individual board claims that position in the main board
+4. **FUNDAMENTAL**: Once a board is won or drawn, it CLOSES permanently - no more moves can be made in that board
+5. The ULTIMATE GOAL is to win 3 boards in a row on the main board (this is what matters most)
+6. You are playing as O, and it's your turn now
+
+Current board state:
+{board_text}
+
+As an Expert player:
+- Prioritize main board victory over individual board wins when strategic
+- Set up multiple winning threats simultaneously
+- Use advanced tactics like forks and forced moves
+- Control key board positions (center, corners)
+- Think several moves ahead
+- Balance immediate threats with long-term strategy
+- Create situations where opponent cannot block all winning paths
+- **CRITICAL**: Always respect that closed boards are permanently unavailable
+
+Analyze the board deeply and suggest your optimal move. Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2")
+Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
+"""
     
     def get_random_move(self):
         """Fallback: make a random valid move"""
@@ -278,6 +406,7 @@ def get_game_state():
         'game_over': game.game_over,
         'winner': game.winner,
         'game_mode': game.game_mode,
+        'difficulty': game.difficulty,
         'ai_thinking': game.ai_thinking,
         'ai_enabled': AI_ENABLED
     })
@@ -300,6 +429,7 @@ def make_move():
             'game_over': game.game_over,
             'winner': game.winner,
             'game_mode': game.game_mode,
+            'difficulty': game.difficulty,
             'ai_thinking': game.ai_thinking,
             'ai_enabled': AI_ENABLED
         }
@@ -330,6 +460,7 @@ def make_move():
                 'game_over': game.game_over,
                 'winner': game.winner,
                 'game_mode': game.game_mode,
+                'difficulty': game.difficulty,
                 'ai_thinking': False,
                 'ai_enabled': AI_ENABLED
             }
@@ -340,7 +471,8 @@ def make_move():
 def reset_game():
     data = request.json or {}
     game_mode = data.get('game_mode', '1-player')
-    game.reset_game(game_mode)
+    difficulty = data.get('difficulty', 'Noobie')
+    game.reset_game(game_mode, difficulty)
     return jsonify({
         'game_state': {
             'boards': game.boards,
@@ -349,6 +481,7 @@ def reset_game():
             'game_over': game.game_over,
             'winner': game.winner,
             'game_mode': game.game_mode,
+            'difficulty': game.difficulty,
             'ai_thinking': game.ai_thinking,
             'ai_enabled': AI_ENABLED
         }
@@ -367,10 +500,75 @@ def set_game_mode():
             'game_over': game.game_over,
             'winner': game.winner,
             'game_mode': game.game_mode,
+            'difficulty': game.difficulty,
             'ai_thinking': game.ai_thinking,
             'ai_enabled': AI_ENABLED
         }
     })
+
+@app.route('/api/set_difficulty', methods=['POST'])
+def set_difficulty():
+    data = request.json
+    difficulty = data.get('difficulty', 'Noobie')
+    game.set_difficulty(difficulty)
+    return jsonify({
+        'game_state': {
+            'boards': game.boards,
+            'main_board': game.main_board,
+            'current_player': game.current_player,
+            'game_over': game.game_over,
+            'winner': game.winner,
+            'game_mode': game.game_mode,
+            'difficulty': game.difficulty,
+            'ai_thinking': game.ai_thinking,
+            'ai_enabled': AI_ENABLED
+        }
+    })
+
+@app.route('/api/ai_message', methods=['POST'])
+def get_ai_message():
+    """Get AI message for post-game interaction"""
+    data = request.json
+    prompt = data.get('prompt', '')
+    game_log = data.get('game_log', 'general')
+    
+    # Log the interaction
+    log_ai_interaction(prompt, game_log)
+    
+    if not AI_ENABLED:
+        return jsonify({
+            'success': False,
+            'message': 'AI is not available for comments.'
+        })
+    
+    try:
+        response = model.generate_content(prompt)
+        message = response.text.strip()
+        
+        return jsonify({
+            'success': True,
+            'message': message
+        })
+        
+    except Exception as e:
+        print(f"AI message error: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'AI is experiencing technical difficulties.'
+        })
+
+def log_ai_interaction(prompt, game_log):
+    """Log AI interactions to file"""
+    import datetime
+    
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"[{timestamp}] {game_log.upper()}: {prompt}\n"
+    
+    try:
+        with open('ai_interactions.log', 'a', encoding='utf-8') as f:
+            f.write(log_entry)
+    except Exception as e:
+        print(f"Logging error: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True)

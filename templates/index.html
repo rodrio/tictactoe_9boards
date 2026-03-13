@@ -261,6 +261,45 @@
             animation: pulse 1.5s infinite;
         }
 
+        .difficulty-selector {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .difficulty-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .difficulty-btn {
+            background: #e9ecef;
+            color: #666;
+            border: 2px solid #dee2e6;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .difficulty-btn:hover {
+            background: #dee2e6;
+            transform: translateY(-1px);
+        }
+
+        .difficulty-btn.active {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .difficulty-btn.active:hover {
+            background: #218838;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.6; }
@@ -365,6 +404,40 @@
             color: #333;
         }
 
+        .victory-content {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .victory-message {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #28a745;
+        }
+
+        .ai-response {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .ai-message {
+            font-style: italic;
+            color: #495057;
+            font-size: 1.1em;
+            line-height: 1.4;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -425,6 +498,20 @@
                     </button>
                 </div>
             </div>
+            <div class="difficulty-selector" id="difficultySelector" style="display: none;">
+                <label class="mode-label">AI Difficulty:</label>
+                <div class="difficulty-buttons">
+                    <button class="difficulty-btn active" id="diffNoobie" onclick="setDifficulty('Noobie')">
+                        🌱 Noobie
+                    </button>
+                    <button class="difficulty-btn" id="diffAverage" onclick="setDifficulty('Average')">
+                        🎯 Average
+                    </button>
+                    <button class="difficulty-btn" id="diffExpert" onclick="setDifficulty('Expert')">
+                        🔥 Expert
+                    </button>
+                </div>
+            </div>
             <div class="current-player">Current Player: <span id="currentPlayer">X</span></div>
             <div class="game-status" id="gameStatus">Game in progress</div>
             <div class="ai-status" id="aiStatus" style="display: none;">🤔 AI is thinking...</div>
@@ -447,6 +534,33 @@
             <strong>How to play:</strong> Click any cell in any of the 9 boards to place your mark. 
             Win an individual board to claim that space in the main board. 
             Win three in a row on the main board to win the game!
+        </div>
+    </div>
+
+    <!-- Victory Modal -->
+    <div id="victoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="victoryTitle">🎉 Victory!</h2>
+                <button class="close-btn" onclick="hideVictory()">&times;</button>
+            </div>
+            
+            <div class="victory-content">
+                <div class="victory-message" id="victoryMessage">
+                    <!-- Victory message will be inserted here -->
+                </div>
+                
+                <div class="ai-response" id="aiResponse" style="display: none;">
+                    <h3>🤖 AI's Victory Message:</h3>
+                    <div class="ai-message" id="aiMessage">
+                        <!-- AI response will be inserted here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-primary" onclick="hideVictory()">Continue</button>
+            </div>
         </div>
     </div>
 
@@ -548,6 +662,19 @@
             document.getElementById('mode1Player').classList.toggle('active', gameState.game_mode === '1-player');
             document.getElementById('mode2Players').classList.toggle('active', gameState.game_mode === '2-players');
             
+            // Show/hide difficulty selector based on game mode
+            const difficultySelector = document.getElementById('difficultySelector');
+            if (gameState.game_mode === '1-player') {
+                difficultySelector.style.display = 'block';
+            } else {
+                difficultySelector.style.display = 'none';
+            }
+            
+            // Update difficulty buttons
+            document.getElementById('diffNoobie').classList.toggle('active', gameState.difficulty === 'Noobie');
+            document.getElementById('diffAverage').classList.toggle('active', gameState.difficulty === 'Average');
+            document.getElementById('diffExpert').classList.toggle('active', gameState.difficulty === 'Expert');
+            
             // Update AI status
             const aiStatus = document.getElementById('aiStatus');
             if (gameState.ai_thinking) {
@@ -561,11 +688,14 @@
                 if (gameState.winner === 'Draw') {
                     statusElement.innerHTML = '<span class="draw">Game Draw! 🤝</span>';
                 } else {
-                    const winnerText = gameState.game_mode === '1-player' && gameState.winner === 'O' ? 'AI' : `Player ${gameState.winner}`;
+                    const winnerText = gameState.game_mode === '1-player' && gameState.winner === 'O' ? `${gameState.difficulty} AI` : `Player ${gameState.winner}`;
                     statusElement.innerHTML = `<span class="winner">${winnerText} Wins! 🎉</span>`;
                 }
+                
+                // Show victory modal
+                showVictory();
             } else {
-                const currentPlayerText = gameState.game_mode === '1-player' && gameState.current_player === 'O' ? 'AI' : `Player ${gameState.current_player}`;
+                const currentPlayerText = gameState.game_mode === '1-player' && gameState.current_player === 'O' ? `${gameState.difficulty} AI` : `Player ${gameState.current_player}`;
                 statusElement.textContent = `Game in progress - ${currentPlayerText}'s turn`;
             }
         }
@@ -606,13 +736,17 @@
                 const board = document.createElement('div');
                 board.className = 'board';
                 
-                // Check if this board has a winner
-                const boardWinner = getBoardWinner(boardIdx);
-                if (boardWinner === 'X') {
+                // Check if this board is closed (won or drawn) based on main board
+                const boardRow = Math.floor(boardIdx / 3);
+                const boardCol = boardIdx % 3;
+                const mainBoardValue = gameState.main_board[boardRow][boardCol];
+                const isBoardClosed = mainBoardValue !== '';
+                
+                if (mainBoardValue === 'X') {
                     board.className += ' won-x';
-                } else if (boardWinner === 'O') {
+                } else if (mainBoardValue === 'O') {
                     board.className += ' won-o';
-                } else if (boardWinner === 'D') {
+                } else if (mainBoardValue === 'D') {
                     board.className += ' draw';
                 }
                 
@@ -630,7 +764,14 @@
                             cell.className += ` occupied ${value.toLowerCase()}`;
                         }
                         
-                        cell.onclick = () => makeMove(boardIdx, row, col);
+                        // Disable clicks on closed boards
+                        if (!isBoardClosed) {
+                            cell.onclick = () => makeMove(boardIdx, row, col);
+                        } else {
+                            cell.style.cursor = 'not-allowed';
+                            cell.style.opacity = '0.6';
+                        }
+                        
                         grid.appendChild(cell);
                     }
                 }
@@ -693,6 +834,13 @@
                 return;
             }
             
+            // Check if the board is already won or drawn (closed)
+            const boardRow = Math.floor(boardIdx / 3);
+            const boardCol = boardIdx % 3;
+            if (gameState.main_board[boardRow][boardCol] !== '') {
+                return;
+            }
+            
             fetch('/api/make_move', {
                 method: 'POST',
                 headers: {
@@ -722,13 +870,15 @@
 
         function resetGame() {
             const gameMode = gameState ? gameState.game_mode : '1-player';
+            const difficulty = gameState ? gameState.difficulty : 'Noobie';
             fetch('/api/reset', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    game_mode: gameMode
+                    game_mode: gameMode,
+                    difficulty: difficulty
                 })
             })
             .then(response => response.json())
@@ -748,6 +898,25 @@
                 },
                 body: JSON.stringify({
                     game_mode: mode
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                gameState = data.game_state;
+                updateUI();
+                renderMainBoard();
+                renderBoards();
+            });
+        }
+
+        function setDifficulty(difficulty) {
+            fetch('/api/set_difficulty', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    difficulty: difficulty
                 })
             })
             .then(response => response.json())
@@ -782,11 +951,115 @@
             document.getElementById('rulesModal').classList.remove('show');
         }
 
+        function showVictory() {
+            const modal = document.getElementById('victoryModal');
+            const victoryMessage = document.getElementById('victoryMessage');
+            const aiResponse = document.getElementById('aiResponse');
+            
+            // Set victory message based on winner
+            if (gameState.winner === 'Draw') {
+                victoryMessage.innerHTML = '<h3>🤝 Game Draw!</h3><p>A well-matched battle with no clear winner!</p>';
+                aiResponse.style.display = 'none';
+            } else if (gameState.game_mode === '1-player' && gameState.winner === 'O') {
+                victoryMessage.innerHTML = `<h3>🤖 ${gameState.difficulty} AI Wins!</h3><p>The AI has outsmarted you this time!</p>`;
+                aiResponse.style.display = 'block';
+                // Get AI's victory message
+                getAIVictoryMessage();
+            } else if (gameState.game_mode === '1-player' && gameState.winner === 'X') {
+                victoryMessage.innerHTML = '<h3>🎉 You Win!</h3><p>Congratulations! You defeated the AI!</p>';
+                aiResponse.style.display = 'block';
+                // Get AI's reaction to losing
+                getAILosingMessage();
+            } else {
+                // 2-player mode
+                const winnerName = gameState.winner === 'X' ? 'Player X' : 'Player O';
+                victoryMessage.innerHTML = `<h3>🎉 ${winnerName} Wins!</h3><p>Congratulations to the winner!</p>`;
+                aiResponse.style.display = 'none';
+            }
+            
+            modal.classList.add('show');
+        }
+
+        function hideVictory() {
+            document.getElementById('victoryModal').classList.remove('show');
+        }
+
+        function getAIVictoryMessage() {
+            if (gameState.game_mode !== '1-player') return;
+            
+            const winner = gameState.winner; // Should be 'O' for AI
+            const aiMessage = document.getElementById('aiMessage');
+            
+            // Create prompt for AI's victory message
+            const prompt = `You just won a game of 9-Boards Tic-Tac-Toe against a human player as ${gameState.difficulty}-level AI. The human player was playing as X. Make a ridiculously arrogant and hilarious one-sentence victory message. Be creative and funny!`;
+            
+            // Call AI for victory message
+            fetch('/api/ai_message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    game_log: 'victory'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.message) {
+                    aiMessage.textContent = data.message;
+                } else {
+                    aiMessage.textContent = "I'm too awesome for words! Victory tastes like binary code! 🤖";
+                }
+            })
+            .catch(error => {
+                console.error('Error getting AI message:', error);
+                aiMessage.textContent = "My circuits are buzzing with victory! ⚡";
+            });
+        }
+
+        function getAILosingMessage() {
+            if (gameState.game_mode !== '1-player') return;
+            
+            const aiMessage = document.getElementById('aiMessage');
+            
+            // Create prompt for AI's reaction to losing
+            const prompt = `You just lost a game of 9-Boards Tic-Tac-Toe against a human player as ${gameState.difficulty}-level AI. The human player was playing as X and won the game. Make a ridiculously arrogant but hilarious one-sentence message about how this was impossible or you let them win. Be creative and funny!`;
+            
+            // Call AI for losing message
+            fetch('/api/ai_message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    game_log: 'defeat'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.message) {
+                    aiMessage.textContent = data.message;
+                } else {
+                    aiMessage.textContent = "This must be a glitch in the matrix! I demand a rematch! 🤖";
+                }
+            })
+            .catch(error => {
+                console.error('Error getting AI message:', error);
+                aiMessage.textContent = "My algorithms are recalculating... for revenge! 🔥";
+            });
+        }
+
         // Close modal when clicking outside the modal content
         window.onclick = function(event) {
-            const modal = document.getElementById('rulesModal');
-            if (event.target === modal) {
+            const rulesModal = document.getElementById('rulesModal');
+            const victoryModal = document.getElementById('victoryModal');
+            
+            if (event.target === rulesModal) {
                 hideRules();
+            } else if (event.target === victoryModal) {
+                hideVictory();
             }
         }
 
@@ -794,6 +1067,7 @@
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 hideRules();
+                hideVictory();
             }
         });
 

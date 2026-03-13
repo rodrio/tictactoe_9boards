@@ -7,6 +7,7 @@ A web-based implementation of Tic-Tac-Toe with a 9-boards structure, built with 
 - The game consists of a main 3x3 board where each cell contains an individual 3x3 tic-tac-toe board
 - Players take turns marking cells in any of the 9 individual boards
 - When a player wins an individual board, that board's position in the main board is marked with their symbol
+- **Board Closing**: Once a board is won or drawn, it closes permanently - no more moves can be made in that board
 - The goal is to win three in a row on the main board (horizontally, vertically, or diagonally)
 - If an individual board ends in a draw, it's marked with 'D' on the main board
 
@@ -108,6 +109,7 @@ The application includes:
 
 ### Controls
 - **Game Mode Selection**: Click the mode buttons at the top to switch between 1-player and 2-players
+- **Difficulty Selection**: In 1-player mode, choose between Noobie, Average, or Expert AI difficulty
 - **Making Moves**: Click any empty cell in any board to place your mark
 - **New Game**: Click the "🔄 New Game" button to restart
 - **Rules**: Click "📖 Rules" to see detailed game instructions
@@ -116,10 +118,32 @@ The application includes:
 
 The AI opponent includes:
 - **Strategic Analysis**: Evaluates board positions and potential moves
-- **Offensive Play**: Attempts to win individual boards and the main game
+- **Offensive Play**: Attempts to win individual boards and main game
 - **Defensive Play**: Blocks opponent's winning moves
 - **Board Priority**: Focuses on strategically important board positions
 - **Fallback Logic**: If API is unavailable, uses random valid moves
+- **Complete Logging**: All AI prompts and responses are logged to `ai_interactions.log`
+
+### Difficulty Levels
+
+**🌱 Noobie**
+- Simple, safe moves
+- Basic understanding of rules
+- Focuses on obvious wins and blocks
+- Good for beginners
+
+**🎯 Average**
+- Balanced offensive/defensive strategy
+- Considers board position importance
+- Plans ahead for main board victories
+- Challenging but fair gameplay
+
+**🔥 Expert**
+- Advanced tactical play
+- Sets up multiple winning threats
+- Controls key board positions
+- Thinks several moves ahead
+- Creates forced move situations
 
 ```
 tictactoe_9boards/
