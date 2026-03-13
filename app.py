@@ -284,12 +284,12 @@ Current board state:
 {board_text}
 
 As an Average player:
-- Balance offensive and defensive strategies
+- Focus on making simple, safe moves
 - Look for opportunities to win individual boards
-- Block opponent's winning moves on individual boards
-- Consider the strategic importance of board positions on the main board
+- Block opponent's winning moves on individual boards and pay attention on the main 3x3 board to avoid losing
+- Consider the strategic importance of board positions on the main 3x3 board
 - Plan ahead for main board victories
-- Remember: closed boards are off-limits
+- Remember: won/drawn boards are permanently closed - Balance offensive and defensive strategies
 
 Analyze the board and suggest your best strategic move. Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2")
 Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
@@ -312,13 +312,12 @@ Current board state:
 
 As an Expert player:
 - Prioritize main board victory over individual board wins when strategic
-- Set up multiple winning threats simultaneously
-- Use advanced tactics like forks and forced moves
-- Control key board positions (center, corners)
-- Think several moves ahead
+- Look for opportunities to win individual boards while trying to set up multiple winning threats
+- Block opponent's winning moves on individual boards and pay attention on the main 3x3 board to avoid losing
 - Balance immediate threats with long-term strategy
+- Think several moves ahead considering the strategic importance of board positions on the main 3x3 board
 - Create situations where opponent cannot block all winning paths
-- **CRITICAL**: Always respect that closed boards are permanently unavailable
+- Remember: won/drawn boards are permanently closed - Balance offensive and defensive strategies
 
 Analyze the board deeply and suggest your optimal move. Respond with ONLY the move in format: "board_idx,row,col" (e.g., "4,1,2")
 Make sure the chosen cell is empty (marked with "." in the individual boards) AND the board is not already closed.
@@ -455,6 +454,11 @@ Make sure the chosen cell is empty (marked with "." in the individual boards) AN
 
 # Global game instance
 game = TicTacToe9Boards()
+
+# Check for environment variable API key
+env_api_key = os.environ.get('GOOGLE_API_KEY')
+if env_api_key:
+    game.set_api_key(env_api_key)
 
 @app.route('/')
 def index():
@@ -607,6 +611,42 @@ def set_api_key():
         'success': True,
         'message': 'API key set successfully'
     })
+
+@app.route('/api/get_env_api_key', methods=['GET'])
+def get_env_api_key():
+    """Return the environment API key if available"""
+    env_api_key = os.environ.get('GOOGLE_API_KEY')
+    if env_api_key:
+        return jsonify({
+            'has_env_key': True,
+            'api_key': env_api_key
+        })
+    else:
+        return jsonify({
+            'has_env_key': False,
+            'api_key': None
+        })
+
+@app.route('/api/get_game_log', methods=['GET'])
+def get_game_log():
+    """Return the contents of the AI interactions log file"""
+    try:
+        with open('ai_interactions.log', 'r', encoding='utf-8') as f:
+            log_content = f.read()
+        return jsonify({
+            'success': True,
+            'log_content': log_content
+        })
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'error': 'No game log file found'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Error reading log file: {str(e)}'
+        })
 
 @app.route('/api/ai_message', methods=['POST'])
 def get_ai_message():
