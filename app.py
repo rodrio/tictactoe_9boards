@@ -4,10 +4,10 @@ import os
 import datetime
 import logging
 try:
-    import google.generativeai as genai
+    import google.genai as genai
 except ImportError:
     genai = None
-    print("Warning: google-generativeai not installed. AI features will be disabled.")
+    print("Warning: google-genai not installed. AI features will be disabled.")
 
 app = Flask(__name__)
 
@@ -195,9 +195,8 @@ class TicTacToe9Boards:
         
         try:
             # Configure Gemini with the provided API key
-            import google.generativeai as genai
-            genai.configure(api_key=self.api_key)
-            model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+            import google.genai as genai
+            client = genai.Client(api_key=self.api_key)
             
             board_text = self.board_to_text()
             prompt = self.get_ai_prompt(board_text)
@@ -205,7 +204,10 @@ class TicTacToe9Boards:
             # Log the prompt sent to Gemini
             self.log_ai_prompt(prompt)
             
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model='gemini-3.1-flash-lite-preview',
+                contents=prompt
+            )
             move_text = response.text.strip()
             
             # Log the response from Gemini
@@ -566,12 +568,14 @@ def validate_api_key():
     
     try:
         # Configure Gemini with the provided key
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+        import google.genai as genai
+        client = genai.Client(api_key=api_key)
         
         # Test the API with a simple request
-        test_response = model.generate_content("Hello, are you working?")
+        test_response = client.models.generate_content(
+            model='gemini-3.1-flash-lite-preview',
+            contents="Hello, are you working?"
+        )
         
         if test_response.text:
             return jsonify({
@@ -622,11 +626,13 @@ def get_ai_message():
     
     try:
         # Use the game's API key
-        import google.generativeai as genai
-        genai.configure(api_key=game.api_key)
-        model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+        import google.genai as genai
+        client = genai.Client(api_key=game.api_key)
         
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-3.1-flash-lite-preview',
+            contents=prompt
+        )
         message = response.text.strip()
         
         return jsonify({
